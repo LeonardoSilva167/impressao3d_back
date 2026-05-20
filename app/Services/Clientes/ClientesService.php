@@ -42,7 +42,7 @@ class ClientesService
                 $params->valor = $atributes->saldo;
                 $params->dthr_lancamento = Carbon::now()->format('Y-m-d');
                 $params->descricao = "Saldo inicial conta bancária: {$atributes->apelido}";
-                // $this->_service_lancamentos->handleAddLancamentos($params);
+                
             }
 
             DB::commit();

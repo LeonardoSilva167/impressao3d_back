@@ -15,6 +15,7 @@ Route::prefix('v1')->group(function () {
     Route::prefix('pncp')->group(function () {require __DIR__ . '/routerFiles/pncpRouter.php';   });// Rota de Contas Bancarias
     Route::prefix('tipo-produto')->group(function () {require __DIR__ . '/routerFiles/tipoProdutoRouter.php';});// Rota de Marcas
     Route::prefix('subtipo-produto')->group(function () {require __DIR__ . '/routerFiles/subtipoProdutoRouter.php';});// Rota de Marcas
+    Route::prefix('cores')->group(function () {require __DIR__ . '/routerFiles/coresRouter.php';});// Rota de Cores
 // routes/api.php
 
 // Route::post('/pncp/edital', [PncpController::class, 'buscarEdital']);
