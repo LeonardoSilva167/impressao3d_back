@@ -18,7 +18,7 @@ class ProdutoLinhasService
     public function listarLookupsProdutoLinhas()
     {
         $data = [];
-        $data['marcas'] = Marca::orderBy('nome')->get();
+        $data['marcas'] = Marca::orderBy('descricao')->get();
         $data['usoPeriodos'] = UsoPeriodo::orderBy('descricao')->get();
         $data['tipoProdutos'] = TipoProduto::orderBy('descricao')->get();
         return $data;

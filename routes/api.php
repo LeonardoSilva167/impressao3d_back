@@ -16,12 +16,11 @@ Route::prefix('v1')->group(function () {
     Route::prefix('tipo-produto')->group(function () {require __DIR__ . '/routerFiles/tipoProdutoRouter.php';});// Rota de Marcas
     Route::prefix('subtipo-produto')->group(function () {require __DIR__ . '/routerFiles/subtipoProdutoRouter.php';});// Rota de Marcas
     Route::prefix('cores')->group(function () {require __DIR__ . '/routerFiles/coresRouter.php';});// Rota de Cores
+    Route::prefix('marcas')->group(function () {require __DIR__ . '/routerFiles/marcasRouter.php';});// Rota de Marcas
 // routes/api.php
 
 // Route::post('/pncp/edital', [PncpController::class, 'buscarEdital']);
 
-
-    // Route::prefix('marcas')->group(function () {require __DIR__ . '/routerFiles/marcasRouter.php';});// Rota de Marcas
     // Route::prefix('linhas-produtos')->group(function () {require __DIR__ . '/routerFiles/linhaProdutosRouter.php';});// Rota de Linhas de Produtos
     // Route::prefix('produtos')->group(function () {require __DIR__ . '/routerFiles/produtosRouter.php';});// Rota de Produtos
     // Route::prefix('grades-produtos')->group(function () {require __DIR__ . '/routerFiles/gradeProdutosRouter.php';});// Rota de Grades de Produtos
