@@ -22,6 +22,7 @@ Route::prefix('v1')->group(function () {
     Route::prefix('filamentos')->group(function () {require __DIR__ . '/routerFiles/filamentosRouter.php';});// Rota de Filamentos
     Route::prefix('plataforma-compras')->group(function () {require __DIR__ . '/routerFiles/plataformaComprasRouter.php';});// Rota de Plataformas de Compra
     Route::prefix('categorias-itens')->group(function () {require __DIR__ . '/routerFiles/categoriasItensRouter.php';});// Rota de Categorias de Itens
+    Route::prefix('itens')->group(function () {require __DIR__ . '/routerFiles/itensRouter.php';});// Rota de Itens
 // routes/api.php
 
 // Route::post('/pncp/edital', [PncpController::class, 'buscarEdital']);
