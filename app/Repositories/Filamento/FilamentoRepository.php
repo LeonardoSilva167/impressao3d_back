@@ -109,6 +109,7 @@ class FilamentoRepository
                 'ent.created_at',
                 'tm.descricao as tipo_material_descricao',
                 'c.descricao as cor_descricao',
+                'c.hexadecimal as cor_hexadecimal',
                 'lm.descricao as linha_marca_descricao',
                 'm.descricao as marca_descricao',
             )
