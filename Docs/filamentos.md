@@ -2,7 +2,7 @@
 
 ## Descrição
 
-Cadastro de filamentos com composição automática de resumo e código, baseado nos relacionamentos com tipo de material, cor, linha de marca e marca.
+Cadastro especializado de filamentos, vinculado automaticamente a um item genérico do sistema. Cada filamento possui exatamente um item correspondente na categoria `FILAMENTO`.
 
 ---
 
@@ -14,6 +14,7 @@ Cadastro de filamentos com composição automática de resumo e código, baseado
 | id_cor              | FK      | Sim         | referência `cores`                          |
 | id_linha_marca      | FK      | Sim         | referência `linhas_marcas`                  |
 | id_marca            | FK      | Sim         | referência `marcas`                         |
+| id_item             | FK      | Sim         | referência `itens` (único, gerado no backend) |
 | codigo              | string  | Sim         | gerado automaticamente (`FIL-000001`)       |
 | resumo              | string  | Sim         | gerado automaticamente no backend           |
 | qtd                 | decimal | Não         | default `0`, mínimo `0`                     |
@@ -27,6 +28,14 @@ Cadastro de filamentos com composição automática de resumo e código, baseado
 - O código é gerado automaticamente no padrão `FIL-000001`, `FIL-000002`, etc.
 - Não é permitido cadastrar combinação duplicada de `id_tipo_material`, `id_cor`, `id_linha_marca` e `id_marca`.
 - Existe índice único composto no banco para garantir a unicidade da combinação.
+- Ao cadastrar filamento, o backend cria automaticamente um item vinculado (`id_item`).
+- A descrição do item usa o resumo do filamento.
+- O código do item usa o mesmo código do filamento.
+- A categoria do item é `FILAMENTO`.
+- Relação 1:1 entre filamento e item (`id_item` possui constraint UNIQUE).
+- Ao editar filamento, a descrição do item vinculado é atualizada com o novo resumo.
+- Ao excluir filamento, o item vinculado também é excluído (soft delete).
+- O frontend **não** deve enviar `id_item` — o vínculo é gerenciado exclusivamente pelo backend.
 
 ---
 
@@ -35,6 +44,7 @@ Cadastro de filamentos com composição automática de resumo e código, baseado
 | Tipo        | Caminho                                                                  |
 |-------------|--------------------------------------------------------------------------|
 | Migration   | `database/migrations/2026_05_22_000002_create_filamentos_table.php`      |
+| Migration   | `database/migrations/2026_05_23_000004_alter_filamentos_add_id_item.php` |
 | Model       | `app/Models/Filamento.php`                                               |
 | Repository  | `app/Repositories/Filamento/FilamentoRepository.php`                     |
 | Requests    | `app/Http/Requests/Filamento/FilamentoCadastrarRequest.php`              |
@@ -61,6 +71,6 @@ Cadastro de filamentos com composição automática de resumo e código, baseado
 
 ## Observações
 
-- Os campos `codigo` e `resumo` são somente leitura e não devem ser enviados pelo front-end.
+- Os campos `codigo`, `resumo` e `id_item` são somente leitura e não devem ser enviados pelo front-end.
 - O endpoint `/lookups` retorna listas de tipos de material, cores, linhas de marcas e marcas para os selects do formulário.
 - A busca paginada filtra por `resumo`, `codigo` e `palavra_chave` (pesquisa em `resumo` e `codigo`).

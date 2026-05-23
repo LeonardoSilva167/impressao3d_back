@@ -14,7 +14,7 @@ class FilamentoEditarRequest extends FormRequest
 
     protected function prepareForValidation(): void
     {
-        $this->replace($this->except(['codigo', 'resumo']));
+        $this->replace($this->except(['codigo', 'resumo', 'id_item']));
     }
 
     public function rules(): array

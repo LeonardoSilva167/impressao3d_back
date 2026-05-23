@@ -22,6 +22,7 @@ class Filamento extends Model
         'id_cor',
         'id_linha_marca',
         'id_marca',
+        'id_item',
         'codigo',
         'resumo',
         'qtd',
@@ -34,6 +35,7 @@ class Filamento extends Model
         'id_cor'             => 'integer',
         'id_linha_marca'     => 'integer',
         'id_marca'           => 'integer',
+        'id_item'            => 'integer',
         'qtd'                => 'decimal:2',
         'preco_medio_grama'  => 'decimal:4',
         'created_at'         => 'datetime',
@@ -61,5 +63,10 @@ class Filamento extends Model
     public function marca()
     {
         return $this->belongsTo(Marca::class, 'id_marca');
+    }
+
+    public function item()
+    {
+        return $this->belongsTo(Item::class, 'id_item');
     }
 }

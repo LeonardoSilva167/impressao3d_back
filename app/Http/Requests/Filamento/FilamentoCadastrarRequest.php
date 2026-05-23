@@ -14,7 +14,7 @@ class FilamentoCadastrarRequest extends FormRequest
 
     protected function prepareForValidation(): void
     {
-        $data = $this->except(['codigo', 'resumo']);
+        $data = $this->except(['codigo', 'resumo', 'id_item']);
 
         $data['qtd']               = $this->input('qtd') ?? 0;
         $data['preco_medio_grama'] = $this->input('preco_medio_grama') ?? 0;

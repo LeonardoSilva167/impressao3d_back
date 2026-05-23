@@ -39,4 +39,9 @@ class Item extends Model
     {
         return $this->belongsTo(CategoriaItem::class, 'id_categoria_item');
     }
+
+    public function filamento()
+    {
+        return $this->hasOne(Filamento::class, 'id_item');
+    }
 }

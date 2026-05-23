@@ -2,7 +2,9 @@
 
 namespace App\Services\Filamento;
 
+use App\Models\CategoriaItem;
 use App\Models\Cor;
+use App\Models\Item;
 use App\Models\LinhaMarca;
 use App\Models\Marca;
 use App\Models\TipoMaterial;
@@ -120,12 +122,14 @@ class FilamentoService
             );
 
             $codigo = $this->_repository->generateNextCodigo();
+            $item   = $this->createItemForFilamento($resumo, $codigo);
 
             $data = [
                 'id_tipo_material'  => (int) $atributes->id_tipo_material,
                 'id_cor'            => (int) $atributes->id_cor,
                 'id_linha_marca'    => (int) $atributes->id_linha_marca,
                 'id_marca'          => (int) $atributes->id_marca,
+                'id_item'           => $item->id,
                 'codigo'            => $codigo,
                 'resumo'            => $resumo,
                 'qtd'               => $atributes->qtd ?? 0,
@@ -193,6 +197,8 @@ class FilamentoService
                 throw new Exception('Não foi possível editar Filamento', 500);
             }
 
+            $this->updateItemForFilamento((int) $record->id_item, $resumo);
+
             return (object) [
                 'data'    => [],
                 'status'  => true,
@@ -220,6 +226,8 @@ class FilamentoService
             if (!$record) {
                 throw new Exception('Filamento não encontrado', 404);
             }
+
+            $this->deleteItemForFilamento((int) $record->id_item);
 
             $saved = $this->_repository->delete($record);
 
@@ -365,5 +373,64 @@ class FilamentoService
     private function isDuplicateCombinacaoException(QueryException $e): bool
     {
         return str_contains($e->getMessage(), 'filamentos_combinacao_unica');
+    }
+
+    private function getCategoriaFilamentoId(): int
+    {
+        $id = CategoriaItem::where('descricao', 'FILAMENTO')
+            ->whereNull('deleted_at')
+            ->value('id');
+
+        if ($id === null) {
+            throw new Exception('Categoria FILAMENTO não encontrada.', 422);
+        }
+
+        return (int) $id;
+    }
+
+    private function createItemForFilamento(string $resumo, string $codigo): Item
+    {
+        $item = Item::create([
+            'id_categoria_item' => $this->getCategoriaFilamentoId(),
+            'descricao'         => $resumo,
+            'codigo'            => $codigo,
+            'unidade_medida'    => 'g',
+            'controla_estoque'  => true,
+            'gera_custo'        => true,
+            'ativo'             => true,
+        ]);
+
+        return $item;
+    }
+
+    private function updateItemForFilamento(int $idItem, string $resumo): void
+    {
+        $item = Item::where('id', $idItem)->first();
+
+        if (!$item) {
+            throw new Exception('Item vinculado ao filamento não encontrado.', 404);
+        }
+
+        $item->descricao = $resumo;
+        $saved           = $item->save();
+
+        if (!$saved) {
+            throw new Exception('Não foi possível atualizar o item vinculado ao filamento.', 500);
+        }
+    }
+
+    private function deleteItemForFilamento(int $idItem): void
+    {
+        $item = Item::where('id', $idItem)->first();
+
+        if (!$item) {
+            throw new Exception('Item vinculado ao filamento não encontrado.', 404);
+        }
+
+        $saved = $item->delete();
+
+        if (!$saved) {
+            throw new Exception('Não foi possível excluir o item vinculado ao filamento.', 500);
+        }
     }
 }
