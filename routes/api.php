@@ -17,6 +17,8 @@ Route::prefix('v1')->group(function () {
     Route::prefix('subtipo-produto')->group(function () {require __DIR__ . '/routerFiles/subtipoProdutoRouter.php';});// Rota de Marcas
     Route::prefix('cores')->group(function () {require __DIR__ . '/routerFiles/coresRouter.php';});// Rota de Cores
     Route::prefix('marcas')->group(function () {require __DIR__ . '/routerFiles/marcasRouter.php';});// Rota de Marcas
+    Route::prefix('linhas-marcas')->group(function () {require __DIR__ . '/routerFiles/linhasMarcasRouter.php';});// Rota de Linhas de Marcas
+    Route::prefix('tipo-material')->group(function () {require __DIR__ . '/routerFiles/tipoMaterialRouter.php';});// Rota de Tipos de Material
 // routes/api.php
 
 // Route::post('/pncp/edital', [PncpController::class, 'buscarEdital']);
