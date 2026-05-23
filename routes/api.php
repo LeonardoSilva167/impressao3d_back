@@ -21,6 +21,7 @@ Route::prefix('v1')->group(function () {
     Route::prefix('tipo-material')->group(function () {require __DIR__ . '/routerFiles/tipoMaterialRouter.php';});// Rota de Tipos de Material
     Route::prefix('filamentos')->group(function () {require __DIR__ . '/routerFiles/filamentosRouter.php';});// Rota de Filamentos
     Route::prefix('plataforma-compras')->group(function () {require __DIR__ . '/routerFiles/plataformaComprasRouter.php';});// Rota de Plataformas de Compra
+    Route::prefix('categorias-itens')->group(function () {require __DIR__ . '/routerFiles/categoriasItensRouter.php';});// Rota de Categorias de Itens
 // routes/api.php
 
 // Route::post('/pncp/edital', [PncpController::class, 'buscarEdital']);
