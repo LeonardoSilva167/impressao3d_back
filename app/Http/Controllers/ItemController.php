@@ -25,10 +25,15 @@ class ItemController extends Controller
         $this->_requestService = new RequestDataService();
     }
 
-    public function listarLookupsItem()
+    public function listarLookupsItem(Request $request)
     {
         try {
-            $result = $this->_service->handleLookupsItem();
+            if ($request->filled('search')) {
+                $result = $this->_service->getItemLookupsSearch((string) $request->input('search'));
+            } else {
+                $result = $this->_service->handleLookupsItem();
+            }
+
             return response()->json($result, 200);
         } catch (Exception $ex) {
             $statusCode = is_numeric($ex->getCode()) ? (int) $ex->getCode() : 500;

@@ -28,6 +28,37 @@ class ItemService
         ];
     }
 
+    public function getItemLookupsSearch(string $search): array
+    {
+        $termos = array_values(array_filter(preg_split('/\s+/', trim($search)) ?: []));
+
+        if (empty($termos)) {
+            return [];
+        }
+
+        $query = DB::table('itens as ent')
+            ->join('categorias_itens as cat', 'cat.id', '=', 'ent.id_categoria_item')
+            ->whereNull('ent.deleted_at')
+            ->whereNull('cat.deleted_at')
+            ->where('ent.ativo', true)
+            ->select(
+                'ent.id',
+                'ent.descricao',
+                'ent.codigo',
+                'cat.descricao as tipo_item',
+            )
+            ->orderBy('ent.descricao');
+
+        foreach ($termos as $termo) {
+            $query->where(function ($q) use ($termo) {
+                $q->where('ent.descricao', 'like', '%' . $termo . '%')
+                    ->orWhere('ent.codigo', 'like', '%' . $termo . '%');
+            });
+        }
+
+        return $query->limit(10)->get()->toArray();
+    }
+
     // =========================================================
     // HANDLE FUNCTIONS (orquestração + transação)
     // =========================================================
