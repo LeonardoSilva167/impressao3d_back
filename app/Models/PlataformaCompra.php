@@ -25,4 +25,9 @@ class PlataformaCompra extends Model
     ];
 
     protected $dates = ['deleted_at'];
+
+    public function compras()
+    {
+        return $this->hasMany(Compra::class, 'id_plataforma_compra');
+    }
 }

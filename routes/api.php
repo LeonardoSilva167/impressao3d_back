@@ -23,6 +23,8 @@ Route::prefix('v1')->group(function () {
     Route::prefix('plataforma-compras')->group(function () {require __DIR__ . '/routerFiles/plataformaComprasRouter.php';});// Rota de Plataformas de Compra
     Route::prefix('categorias-itens')->group(function () {require __DIR__ . '/routerFiles/categoriasItensRouter.php';});// Rota de Categorias de Itens
     Route::prefix('itens')->group(function () {require __DIR__ . '/routerFiles/itensRouter.php';});// Rota de Itens
+    Route::prefix('compras')->group(function () {require __DIR__ . '/routerFiles/comprasRouter.php';});// Rota de Compras
+    Route::prefix('compras-itens')->group(function () {require __DIR__ . '/routerFiles/comprasItensRouter.php';});// Rota de Itens da Compra
 // routes/api.php
 
 // Route::post('/pncp/edital', [PncpController::class, 'buscarEdital']);

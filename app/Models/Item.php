@@ -44,4 +44,9 @@ class Item extends Model
     {
         return $this->hasOne(Filamento::class, 'id_item');
     }
+
+    public function comprasItens()
+    {
+        return $this->hasMany(CompraItem::class, 'id_item');
+    }
 }
