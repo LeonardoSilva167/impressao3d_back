@@ -9,4 +9,4 @@ Route::get('/listar/{id}',              [PlataformaCompraController::class, 'lis
 Route::post('/cadastrar',               [PlataformaCompraController::class, 'createPlataformaCompra']);
 Route::put('/editar',                   [PlataformaCompraController::class, 'editPlataformaCompra']);
 Route::delete('/excluir/{id}',          [PlataformaCompraController::class, 'deletePlataformaCompra']);
-Route::get('/plataforma-compras-list',  [PlataformaCompraController::class, 'listarPlataformaCompraAsync']);
+Route::get('/plataformas-compra-list',  [PlataformaCompraController::class, 'listarPlataformaCompraAsync']);

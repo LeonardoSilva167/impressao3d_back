@@ -2,16 +2,36 @@
 
 namespace App\Services\Compra;
 
-use App\Models\Compra;
 use App\Models\PlataformaCompra;
+use App\Repositories\Compra\CompraRepository;
+use App\Repositories\CompraItem\CompraItemRepository;
+use App\Services\CompraItem\CompraItemEstoqueService;
 use App\Services\PaginateService;
 use Exception;
 use Illuminate\Support\Facades\DB;
 
 class CompraService
 {
+    /**
+     * @var CompraRepository $_repository
+     */
+    private CompraRepository $_repository;
+
+    /**
+     * @var CompraItemRepository $_compraItemRepository
+     */
+    private CompraItemRepository $_compraItemRepository;
+
+    /**
+     * @var CompraItemEstoqueService $_estoqueService
+     */
+    private CompraItemEstoqueService $_estoqueService;
+
     public function __construct()
     {
+        $this->_repository            = new CompraRepository();
+        $this->_compraItemRepository  = new CompraItemRepository();
+        $this->_estoqueService        = new CompraItemEstoqueService();
     }
 
     // =========================================================
@@ -88,12 +108,8 @@ class CompraService
         try {
             $this->validatePlataformaCompra((int) $atributes->id_plataforma_compra);
 
-            $newData = new Compra((array) $atributes);
-            $saved   = $newData->save();
-
-            if (!$saved) {
-                throw new Exception('Não foi possível cadastrar Compra', 500);
-            }
+            $payload = $this->preparePayload($atributes);
+            $newData = $this->_repository->create($payload);
 
             return (object) [
                 'data'    => $newData,
@@ -108,7 +124,7 @@ class CompraService
     public function updateCompra(object $atributes): object
     {
         try {
-            $record = Compra::where('id', $atributes->id)->first();
+            $record = $this->_repository->findById($atributes->id);
 
             if (!$record) {
                 throw new Exception('Compra não encontrada', 404);
@@ -116,8 +132,8 @@ class CompraService
 
             $this->validatePlataformaCompra((int) $atributes->id_plataforma_compra);
 
-            $record->fill(get_object_vars($atributes));
-            $saved = $record->save();
+            $payload = $this->preparePayload($atributes);
+            $saved   = $this->_repository->update($record, $payload);
 
             if (!$saved) {
                 throw new Exception('Não foi possível editar Compra', 500);
@@ -136,13 +152,20 @@ class CompraService
     public function deleteCompra(int|string $id): object
     {
         try {
-            $record = Compra::where('id', $id)->first();
+            $record = $this->_repository->findById($id);
 
             if (!$record) {
                 throw new Exception('Compra não encontrada', 404);
             }
 
-            $saved = $record->delete();
+            $itens = $this->_compraItemRepository->findByCompraId($id);
+
+            foreach ($itens as $compraItem) {
+                $this->_estoqueService->reverterMovimentacao($compraItem);
+                $this->_compraItemRepository->delete($compraItem);
+            }
+
+            $saved = $this->_repository->delete($record);
 
             if (!$saved) {
                 throw new Exception('Não foi possível excluir Compra', 500);
@@ -173,7 +196,9 @@ class CompraService
             'ent.data_compra',
             'ent.numero_pedido',
             'ent.valor_frete',
-            'ent.desconto',
+            'ent.valor_desconto',
+            'ent.valor_taxa',
+            'ent.valor_imposto',
             'ent.valor_total',
             'ent.observacao',
             'ent.created_at',
@@ -234,7 +259,9 @@ class CompraService
                     'ent.data_compra',
                     'ent.numero_pedido',
                     'ent.valor_frete',
-                    'ent.desconto',
+                    'ent.valor_desconto',
+                    'ent.valor_taxa',
+                    'ent.valor_imposto',
                     'ent.valor_total',
                     'ent.observacao',
                     'ent.created_at',
@@ -249,7 +276,31 @@ class CompraService
                 throw new Exception('Compra não encontrada', 404);
             }
 
-            return collect($record)->toArray();
+            $itens = DB::table('compras_itens as ci')
+                ->join('itens as item', 'item.id', '=', 'ci.id_item')
+                ->select(
+                    'ci.id',
+                    'ci.id_item',
+                    'item.descricao as item_descricao',
+                    'item.codigo as item_codigo',
+                    'item.unidade_medida as item_unidade_medida',
+                    'ci.qtd_compra',
+                    'ci.qtd_interna',
+                    'ci.valor_unitario_compra',
+                    'ci.valor_total',
+                    'ci.valor_unitario_real',
+                )
+                ->whereNull('ci.deleted_at')
+                ->whereNull('item.deleted_at')
+                ->where('ci.id_compra', $id)
+                ->orderBy('item.descricao')
+                ->get()
+                ->toArray();
+
+            $data             = collect($record)->toArray();
+            $data['itens']    = $itens;
+
+            return $data;
         } catch (Exception $e) {
             throw $e;
         }
@@ -296,5 +347,20 @@ class CompraService
         if (!$exists) {
             throw new Exception('Plataforma de Compra não encontrada', 422);
         }
+    }
+
+    private function preparePayload(object $atributes): array
+    {
+        return [
+            'id_plataforma_compra' => (int) $atributes->id_plataforma_compra,
+            'data_compra'          => $atributes->data_compra,
+            'numero_pedido'        => $atributes->numero_pedido ?? null,
+            'valor_frete'          => (float) ($atributes->valor_frete ?? 0),
+            'valor_desconto'       => (float) ($atributes->valor_desconto ?? 0),
+            'valor_taxa'           => (float) ($atributes->valor_taxa ?? 0),
+            'valor_imposto'        => (float) ($atributes->valor_imposto ?? 0),
+            'valor_total'          => (float) $atributes->valor_total,
+            'observacao'           => $atributes->observacao ?? null,
+        ];
     }
 }

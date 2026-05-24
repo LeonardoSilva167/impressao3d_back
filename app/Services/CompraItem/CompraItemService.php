@@ -3,16 +3,28 @@
 namespace App\Services\CompraItem;
 
 use App\Models\Compra;
-use App\Models\CompraItem;
 use App\Models\Item;
+use App\Repositories\CompraItem\CompraItemRepository;
 use App\Services\PaginateService;
 use Exception;
 use Illuminate\Support\Facades\DB;
 
 class CompraItemService
 {
+    /**
+     * @var CompraItemRepository $_repository
+     */
+    private CompraItemRepository $_repository;
+
+    /**
+     * @var CompraItemEstoqueService $_estoqueService
+     */
+    private CompraItemEstoqueService $_estoqueService;
+
     public function __construct()
     {
+        $this->_repository     = new CompraItemRepository();
+        $this->_estoqueService = new CompraItemEstoqueService();
     }
 
     // =========================================================
@@ -29,7 +41,15 @@ class CompraItemService
             'itens' => Item::whereNull('deleted_at')
                 ->where('ativo', true)
                 ->orderBy('descricao')
-                ->get(['id', 'descricao', 'codigo', 'unidade_medida', 'id_categoria_item']),
+                ->get([
+                    'id',
+                    'descricao',
+                    'codigo',
+                    'unidade_medida',
+                    'id_categoria_item',
+                    'estoque',
+                    'custo_medio',
+                ]),
         ];
     }
 
@@ -94,19 +114,14 @@ class CompraItemService
         try {
             $this->validateCompra((int) $atributes->id_compra);
             $this->validateItem((int) $atributes->id_item);
-            $this->validateValores($atributes);
 
             $payload = $this->preparePayload($atributes);
+            $newData = $this->_repository->create($payload);
 
-            $newData = new CompraItem($payload);
-            $saved   = $newData->save();
-
-            if (!$saved) {
-                throw new Exception('Não foi possível cadastrar Item da Compra', 500);
-            }
+            $this->_estoqueService->aplicarMovimentacao($newData);
 
             return (object) [
-                'data'    => $newData,
+                'data'    => $newData->fresh(),
                 'status'  => true,
                 'message' => 'Item da Compra cadastrado com sucesso!',
             ];
@@ -118,7 +133,7 @@ class CompraItemService
     public function updateCompraItem(object $atributes): object
     {
         try {
-            $record = CompraItem::where('id', $atributes->id)->first();
+            $record = $this->_repository->findById($atributes->id);
 
             if (!$record) {
                 throw new Exception('Item da Compra não encontrado', 404);
@@ -126,19 +141,21 @@ class CompraItemService
 
             $this->validateCompra((int) $atributes->id_compra);
             $this->validateItem((int) $atributes->id_item);
-            $this->validateValores($atributes);
+
+            $this->_estoqueService->reverterMovimentacao($record);
 
             $payload = $this->preparePayload($atributes);
-
-            $record->fill($payload);
-            $saved = $record->save();
+            $saved   = $this->_repository->update($record, $payload);
 
             if (!$saved) {
                 throw new Exception('Não foi possível editar Item da Compra', 500);
             }
 
+            $record->refresh();
+            $this->_estoqueService->aplicarMovimentacao($record);
+
             return (object) [
-                'data'    => [],
+                'data'    => $record->fresh(),
                 'status'  => true,
                 'message' => 'Item da Compra alterado com sucesso!',
             ];
@@ -150,13 +167,15 @@ class CompraItemService
     public function deleteCompraItem(int|string $id): object
     {
         try {
-            $record = CompraItem::where('id', $id)->first();
+            $record = $this->_repository->findById($id);
 
             if (!$record) {
                 throw new Exception('Item da Compra não encontrado', 404);
             }
 
-            $saved = $record->delete();
+            $this->_estoqueService->reverterMovimentacao($record);
+
+            $saved = $this->_repository->delete($record);
 
             if (!$saved) {
                 throw new Exception('Não foi possível excluir Item da Compra', 500);
@@ -190,9 +209,11 @@ class CompraItemService
             'item.codigo as item_codigo',
             'item.unidade_medida as item_unidade_medida',
             'cat.descricao as categoria_item_descricao',
-            'ent.qtd',
-            'ent.valor_unitario',
+            'ent.qtd_compra',
+            'ent.qtd_interna',
+            'ent.valor_unitario_compra',
             'ent.valor_total',
+            'ent.valor_unitario_real',
             'ent.created_at',
         );
 
@@ -257,10 +278,14 @@ class CompraItemService
                     'item.codigo as item_codigo',
                     'item.unidade_medida as item_unidade_medida',
                     'item.id_categoria_item',
+                    'item.estoque as item_estoque',
+                    'item.custo_medio as item_custo_medio',
                     'cat.descricao as categoria_item_descricao',
-                    'ent.qtd',
-                    'ent.valor_unitario',
+                    'ent.qtd_compra',
+                    'ent.qtd_interna',
+                    'ent.valor_unitario_compra',
                     'ent.valor_total',
+                    'ent.valor_unitario_real',
                     'ent.created_at',
                 )
                 ->whereNull('ent.deleted_at')
@@ -295,8 +320,10 @@ class CompraItemService
                 'ent.id_item',
                 'item.descricao as item_descricao',
                 'item.codigo as item_codigo',
-                'ent.qtd',
+                'ent.qtd_compra',
+                'ent.qtd_interna',
                 'ent.valor_total',
+                'ent.valor_unitario_real',
             )
             ->orderByDesc('comp.data_compra')
             ->orderBy('item.descricao');
@@ -343,38 +370,22 @@ class CompraItemService
         }
     }
 
-    private function validateValores(object $atributes): void
-    {
-        $qtd           = (float) $atributes->qtd;
-        $valorUnitario = (float) $atributes->valor_unitario;
-        $valorTotal    = (float) $atributes->valor_total;
-
-        if ($qtd <= 0) {
-            throw new Exception('A quantidade deve ser maior que zero', 422);
-        }
-
-        if ($valorUnitario < 0) {
-            throw new Exception('O valor unitário não pode ser negativo', 422);
-        }
-
-        $valorCalculado = round($qtd * $valorUnitario, 2);
-
-        if (round($valorTotal, 2) !== $valorCalculado) {
-            throw new Exception('O valor total deve ser igual à quantidade multiplicada pelo valor unitário', 422);
-        }
-    }
-
     private function preparePayload(object $atributes): array
     {
-        $qtd           = (float) $atributes->qtd;
-        $valorUnitario = (float) $atributes->valor_unitario;
+        $qtdCompra           = (float) $atributes->qtd_compra;
+        $qtdInterna          = (float) $atributes->qtd_interna;
+        $valorUnitarioCompra = (float) $atributes->valor_unitario_compra;
+        $valorTotal          = round($qtdCompra * $valorUnitarioCompra, 2);
+        $valorUnitarioReal   = round($valorTotal / $qtdInterna, 4);
 
         return [
-            'id_compra'      => (int) $atributes->id_compra,
-            'id_item'        => (int) $atributes->id_item,
-            'qtd'            => $qtd,
-            'valor_unitario' => $valorUnitario,
-            'valor_total'    => round($qtd * $valorUnitario, 2),
+            'id_compra'             => (int) $atributes->id_compra,
+            'id_item'               => (int) $atributes->id_item,
+            'qtd_compra'            => $qtdCompra,
+            'qtd_interna'           => $qtdInterna,
+            'valor_unitario_compra' => $valorUnitarioCompra,
+            'valor_total'           => $valorTotal,
+            'valor_unitario_real'   => $valorUnitarioReal,
         ];
     }
 }

@@ -17,6 +17,8 @@ class Item extends Model
         'descricao',
         'codigo',
         'unidade_medida',
+        'estoque',
+        'custo_medio',
         'controla_estoque',
         'gera_custo',
         'ativo',
@@ -25,6 +27,8 @@ class Item extends Model
     protected $casts = [
         'id'                => 'integer',
         'id_categoria_item' => 'integer',
+        'estoque'           => 'decimal:4',
+        'custo_medio'       => 'decimal:4',
         'controla_estoque'  => 'boolean',
         'gera_custo'        => 'boolean',
         'ativo'             => 'boolean',

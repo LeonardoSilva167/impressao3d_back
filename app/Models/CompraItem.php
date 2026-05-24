@@ -15,21 +15,25 @@ class CompraItem extends Model
     protected $fillable = [
         'id_compra',
         'id_item',
-        'qtd',
-        'valor_unitario',
+        'qtd_compra',
+        'qtd_interna',
+        'valor_unitario_compra',
         'valor_total',
+        'valor_unitario_real',
     ];
 
     protected $casts = [
-        'id'             => 'integer',
-        'id_compra'      => 'integer',
-        'id_item'        => 'integer',
-        'qtd'            => 'decimal:2',
-        'valor_unitario' => 'decimal:2',
-        'valor_total'    => 'decimal:2',
-        'created_at'     => 'datetime',
-        'updated_at'     => 'datetime',
-        'deleted_at'     => 'datetime',
+        'id'                    => 'integer',
+        'id_compra'             => 'integer',
+        'id_item'               => 'integer',
+        'qtd_compra'            => 'decimal:4',
+        'qtd_interna'           => 'decimal:4',
+        'valor_unitario_compra' => 'decimal:2',
+        'valor_total'           => 'decimal:2',
+        'valor_unitario_real'   => 'decimal:4',
+        'created_at'            => 'datetime',
+        'updated_at'            => 'datetime',
+        'deleted_at'            => 'datetime',
     ];
 
     protected $dates = ['deleted_at'];

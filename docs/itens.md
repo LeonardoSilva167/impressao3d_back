@@ -16,6 +16,8 @@ Cadastro de itens genéricos do sistema — base central do estoque, compras e c
 | descricao          | string  | Sim         | máx. 255 chars                  |
 | codigo             | string  | Sim         | único, máx. 50 chars            |
 | unidade_medida     | string  | Sim         | máx. 20 chars                   |
+| estoque            | decimal | Sim         | default `0`, atualizado por compras |
+| custo_medio        | decimal | Sim         | default `0`, média ponderada por compras |
 | controla_estoque   | boolean | Sim         |                                 |
 | gera_custo         | boolean | Sim         |                                 |
 | ativo              | boolean | Sim         |                                 |

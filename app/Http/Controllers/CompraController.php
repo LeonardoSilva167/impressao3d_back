@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\Compra\CompraCadastrarRequest;
+use App\Http\Requests\Compra\CompraEditarRequest;
 use App\Services\Compra\CompraService;
 use App\Services\RequestDataService;
 use Exception;
@@ -62,10 +64,10 @@ class CompraController extends Controller
         }
     }
 
-    public function createCompra(Request $request)
+    public function createCompra(CompraCadastrarRequest $request)
     {
         try {
-            $objectAtributes = (object) $request->all();
+            $objectAtributes = (object) $request->validated();
             $result          = $this->_service->handleAddCompra($objectAtributes);
             return response()->json($result, 200);
         } catch (Exception $ex) {
@@ -75,10 +77,10 @@ class CompraController extends Controller
         }
     }
 
-    public function editCompra(Request $request)
+    public function editCompra(CompraEditarRequest $request)
     {
         try {
-            $objectAtributes = (object) $request->all();
+            $objectAtributes = (object) $request->validated();
             $result          = $this->_service->handleEditCompra($objectAtributes);
             return response()->json($result, 200);
         } catch (Exception $ex) {

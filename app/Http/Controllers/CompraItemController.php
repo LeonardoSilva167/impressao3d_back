@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\CompraItem\CompraItemCadastrarRequest;
+use App\Http\Requests\CompraItem\CompraItemEditarRequest;
 use App\Services\CompraItem\CompraItemService;
 use App\Services\RequestDataService;
 use Exception;
@@ -62,10 +64,10 @@ class CompraItemController extends Controller
         }
     }
 
-    public function createCompraItem(Request $request)
+    public function createCompraItem(CompraItemCadastrarRequest $request)
     {
         try {
-            $objectAtributes = (object) $request->all();
+            $objectAtributes = (object) $request->validated();
             $result          = $this->_service->handleAddCompraItem($objectAtributes);
             return response()->json($result, 200);
         } catch (Exception $ex) {
@@ -75,10 +77,10 @@ class CompraItemController extends Controller
         }
     }
 
-    public function editCompraItem(Request $request)
+    public function editCompraItem(CompraItemEditarRequest $request)
     {
         try {
-            $objectAtributes = (object) $request->all();
+            $objectAtributes = (object) $request->validated();
             $result          = $this->_service->handleEditCompraItem($objectAtributes);
             return response()->json($result, 200);
         } catch (Exception $ex) {
