@@ -26,7 +26,7 @@ Cadastro de compras — representa a entrada de itens no negócio. Registra info
 
 - A plataforma informada em `id_plataforma_compra` deve existir e não estar excluída.
 - A listagem é ordenada por `data_compra` (mais recente primeiro).
-- Ao excluir uma compra, todos os itens vinculados são removidos e o estoque/custo dos itens é revertido.
+- Ao excluir uma compra, todos os itens vinculados são removidos e o cache de estoque/preço médio dos itens é recalculado a partir dos lotes restantes.
 - O endpoint `GET /compras/listar/{id}` retorna a compra com a lista de itens vinculados.
 
 ---

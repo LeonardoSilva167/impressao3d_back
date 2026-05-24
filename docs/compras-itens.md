@@ -2,7 +2,7 @@
 
 ## Descrição
 
-Vincula itens a uma compra — representa cada linha de produto/insumo adquirido. Suporta compra por unidade, caixa ou peso, com controle de quantidade interna e cálculo automático de custo unitário real.
+Vincula itens a uma compra — representa cada linha de produto/insumo adquirido. **Cada registro é um lote de estoque.** Suporta compra por unidade, caixa ou peso, com controle de quantidade interna e cálculo automático de custo unitário real.
 
 ---
 
@@ -14,6 +14,8 @@ Vincula itens a uma compra — representa cada linha de produto/insumo adquirido
 | id_item               | FK      | Sim         | referência `itens`                          |
 | qtd_compra            | decimal | Sim         | quantidade comprada (ex: 1 caixa, 2 rolos)  |
 | qtd_interna           | decimal | Sim         | quantidade real interna (ex: 1000g, 240 un) |
+| qtd_original          | decimal | Sim         | quantidade original do lote (= `qtd_interna` na entrada) |
+| qtd_atual             | decimal | Sim         | quantidade restante disponível no lote    |
 | valor_unitario_compra | decimal | Sim         | valor pago por unidade comprada             |
 | valor_total           | decimal | Sim         | calculado: `qtd_compra × valor_unitario_compra` |
 | valor_unitario_real   | decimal | Sim         | calculado: `valor_total / qtd_interna`      |
@@ -35,6 +37,13 @@ Exemplos:
 - Sacos: 240 unidades
 - Parafusos (2 caixas): 1000 unidades
 
+### qtd_original / qtd_atual
+Controle de estoque por lote:
+- **qtd_original**: quantidade comprada no lote (imutável após entrada, exceto edição sem consumo)
+- **qtd_atual**: saldo restante do lote — decrementado por débitos FIFO futuros
+
+Na criação: `qtd_original = qtd_atual = qtd_interna`.
+
 ### valor_unitario_compra
 Valor pago por unidade comprada.
 
@@ -52,6 +61,7 @@ Exemplo filamento: R$ 89,90 / 1000g = R$ 0,0899 por grama.
 ### Filamento
 - qtd_compra: 1
 - qtd_interna: 1000 (gramas)
+- qtd_original / qtd_atual: 1000
 - valor_unitario_compra: 89,90
 - valor_total: 89,90
 - valor_unitario_real: 0,0899
@@ -59,16 +69,10 @@ Exemplo filamento: R$ 89,90 / 1000g = R$ 0,0899 por grama.
 ### Sacos
 - qtd_compra: 1
 - qtd_interna: 240 (unidades)
+- qtd_original / qtd_atual: 240
 - valor_unitario_compra: 24,00
 - valor_total: 24,00
 - valor_unitario_real: 0,10
-
-### Parafusos
-- qtd_compra: 2 (caixas)
-- qtd_interna: 1000 (unidades)
-- valor_unitario_compra: 40,00
-- valor_total: 80,00
-- valor_unitario_real: 0,08
 
 ---
 
@@ -77,11 +81,16 @@ Exemplo filamento: R$ 89,90 / 1000g = R$ 0,0899 por grama.
 - A compra informada em `id_compra` deve existir e não estar excluída.
 - O item informado em `id_item` deve existir e não estar excluído.
 - `valor_total` e `valor_unitario_real` são calculados automaticamente pelo backend.
-- Ao cadastrar/editar/excluir item da compra, o sistema atualiza automaticamente:
-  - **estoque** do item (`+qtd_interna` na entrada, reversão na edição/exclusão)
-  - **custo médio** do item (média ponderada usando `valor_unitario_real`)
-- Respeita flags do item: `controla_estoque` e `gera_custo`.
-- A listagem é ordenada por data da compra (mais recente primeiro) e descrição do item.
+- Ao cadastrar item da compra:
+  - `qtd_original = qtd_atual = qtd_interna`
+  - recalcula `estoque_atual` e `preco_medio_atual` do item
+- Ao editar/excluir item da compra:
+  - só é permitido se o lote não foi parcialmente consumido (`qtd_atual = qtd_original`)
+  - recalcula cache do item
+- **Preço médio** do item: `SUM(qtd_atual × valor_unitario_real) / SUM(qtd_atual)` — apenas lotes com `qtd_atual > 0`
+- **Estoque** do item: `SUM(qtd_atual)` de todos os lotes ativos
+- Respeita flags do item: `controla_estoque` e `gera_custo`
+- Débito futuro de estoque (vendas, composição, consumo) usará **FIFO** — lote mais antigo primeiro
 
 ---
 
@@ -90,11 +99,12 @@ Exemplo filamento: R$ 89,90 / 1000g = R$ 0,0899 por grama.
 | Tipo        | Caminho                                                                    |
 |-------------|----------------------------------------------------------------------------|
 | Migration   | `database/migrations/2026_05_24_000002_create_compras_itens_table.php` |
-| Migration   | `database/migrations/2026_05_24_000004_alter_compras_itens_restructure.php` |
+| Migration   | `database/migrations/2026_05_24_000006_alter_estoque_controle_por_lote.php` |
 | Model       | `app/Models/CompraItem.php`                                                |
 | Controller  | `app/Http/Controllers/CompraItemController.php`                            |
 | Service     | `app/Services/CompraItem/CompraItemService.php`                            |
 | Service     | `app/Services/CompraItem/CompraItemEstoqueService.php`                       |
+| Service     | `app/Services/Item/ItemEstoqueRecalculoService.php`                          |
 | Repository  | `app/Repositories/CompraItem/CompraItemRepository.php`                     |
 | Requests    | `app/Http/Requests/CompraItem/CompraItemCadastrarRequest.php`                |
 | Requests    | `app/Http/Requests/CompraItem/CompraItemEditarRequest.php`                   |
@@ -128,12 +138,12 @@ Exemplo filamento: R$ 89,90 / 1000g = R$ 0,0899 por grama.
 }
 ```
 
-O backend calcula automaticamente `valor_total` e `valor_unitario_real`.
+O backend calcula automaticamente `valor_total`, `valor_unitario_real`, `qtd_original` e `qtd_atual`.
 
 ---
 
 ## Observações
 
-- O endpoint `/lookups` retorna as listas de compras e itens ativos (com estoque e custo médio) para os selects do formulário.
+- O endpoint `/lookups` retorna as listas de compras e itens ativos para os selects do formulário.
 - A busca paginada filtra por `id_compra`, `id_item`, `id_categoria_item` e `palavra_chave`.
 - A listagem assíncrona (`/compras-itens-list`) aceita filtro por `id_compra` e `palavra_chave`.

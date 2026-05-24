@@ -16,8 +16,8 @@ Cadastro de itens genéricos do sistema — base central do estoque, compras e c
 | descricao          | string  | Sim         | máx. 255 chars                  |
 | codigo             | string  | Sim         | único, máx. 50 chars            |
 | unidade_medida     | string  | Sim         | máx. 20 chars                   |
-| estoque            | decimal | Sim         | default `0`, atualizado por compras |
-| custo_medio        | decimal | Sim         | default `0`, média ponderada por compras |
+| estoque_atual      | decimal | Sim         | default `0`, cache recalculado a partir dos lotes |
+| preco_medio_atual  | decimal | Sim         | default `0`, cache recalculado a partir dos lotes com estoque |
 | controla_estoque   | boolean | Sim         |                                 |
 | gera_custo         | boolean | Sim         |                                 |
 | ativo              | boolean | Sim         |                                 |
@@ -39,6 +39,8 @@ Cadastro de itens genéricos do sistema — base central do estoque, compras e c
 - O campo `codigo` deve ser único no sistema.
 - A categoria informada em `id_categoria_item` deve existir e estar ativa (não excluída).
 - A listagem assíncrona (`/itens-list`) retorna apenas itens ativos.
+- `estoque_atual` e `preco_medio_atual` são **campos cache** — recalculados automaticamente a partir dos lotes (`compras_itens`).
+- O preço médio considera apenas lotes com `qtd_atual > 0`.
 
 ---
 
@@ -50,6 +52,7 @@ Cadastro de itens genéricos do sistema — base central do estoque, compras e c
 | Model       | `app/Models/Item.php`                                                    |
 | Controller  | `app/Http/Controllers/ItemController.php`                                |
 | Service     | `app/Services/Item/ItemService.php`                                      |
+| Service     | `app/Services/Item/ItemEstoqueRecalculoService.php`                      |
 | Rotas       | `routes/routerFiles/itensRouter.php`                                     |
 
 ---

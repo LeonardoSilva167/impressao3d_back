@@ -3,102 +3,71 @@
 namespace App\Services\CompraItem;
 
 use App\Models\CompraItem;
-use App\Models\Item;
-use App\Repositories\Item\ItemRepository;
+use App\Repositories\CompraItem\CompraItemRepository;
+use App\Services\Item\ItemEstoqueRecalculoService;
 use Exception;
 
 class CompraItemEstoqueService
 {
     /**
-     * @var ItemRepository $_itemRepository
+     * @var CompraItemRepository $_compraItemRepository
      */
-    private ItemRepository $_itemRepository;
+    private CompraItemRepository $_compraItemRepository;
+
+    /**
+     * @var ItemEstoqueRecalculoService $_recalculoService
+     */
+    private ItemEstoqueRecalculoService $_recalculoService;
 
     public function __construct()
     {
-        $this->_itemRepository = new ItemRepository();
+        $this->_compraItemRepository = new CompraItemRepository();
+        $this->_recalculoService     = new ItemEstoqueRecalculoService();
     }
 
     public function aplicarMovimentacao(CompraItem $compraItem): void
     {
-        $item = $this->_itemRepository->findByIdForUpdate($compraItem->id_item);
-
-        if (!$item) {
-            throw new Exception('Item não encontrado', 422);
-        }
-
-        $this->adicionarEstoqueECusto(
-            $item,
-            (float) $compraItem->qtd_interna,
-            (float) $compraItem->valor_unitario_real
-        );
+        $this->validarLote($compraItem);
+        $this->_recalculoService->recalcularItem($compraItem->id_item);
     }
 
     public function reverterMovimentacao(CompraItem $compraItem): void
     {
-        $item = $this->_itemRepository->findByIdForUpdate($compraItem->id_item);
+        $this->validarReversaoLote($compraItem);
 
-        if (!$item) {
-            throw new Exception('Item não encontrado', 422);
-        }
+        $this->_compraItemRepository->update($compraItem, ['qtd_atual' => 0]);
+        $compraItem->refresh();
 
-        $this->removerEstoque(
-            $item,
-            (float) $compraItem->qtd_interna
-        );
+        $this->_recalculoService->recalcularItem($compraItem->id_item);
     }
 
-    private function adicionarEstoqueECusto(Item $item, float $qtdInterna, float $valorUnitarioReal): void
+    private function validarLote(CompraItem $compraItem): void
     {
-        $estoqueAnterior = (float) $item->estoque;
-        $custoAnterior   = (float) $item->custo_medio;
-        $payload         = [];
-
-        if ($item->controla_estoque) {
-            $payload['estoque'] = round($estoqueAnterior + $qtdInterna, 4);
+        if (!$compraItem->id_item) {
+            throw new Exception('Lote sem item vinculado.', 422);
         }
 
-        if ($item->gera_custo) {
-            $estoqueParaCalculo = $item->controla_estoque ? $estoqueAnterior : 0;
-            $novoEstoque        = $estoqueParaCalculo + $qtdInterna;
-
-            if ($novoEstoque > 0) {
-                $payload['custo_medio'] = round(
-                    (($estoqueParaCalculo * $custoAnterior) + ($qtdInterna * $valorUnitarioReal)) / $novoEstoque,
-                    4
-                );
-            } else {
-                $payload['custo_medio'] = round($valorUnitarioReal, 4);
-            }
+        if ((float) $compraItem->qtd_original <= 0) {
+            throw new Exception('Lote sem quantidade original.', 422);
         }
 
-        if (!empty($payload)) {
-            $this->_itemRepository->update($item, $payload);
+        if ((float) $compraItem->qtd_atual < 0) {
+            throw new Exception('Quantidade atual do lote não pode ser negativa.', 422);
         }
     }
 
-    private function removerEstoque(Item $item, float $qtdInterna): void
+    private function validarReversaoLote(CompraItem $compraItem): void
     {
-        if (!$item->controla_estoque) {
-            return;
-        }
+        $this->validarLote($compraItem);
 
-        $estoqueAnterior = (float) $item->estoque;
-        $novoEstoque     = round($estoqueAnterior - $qtdInterna, 4);
+        $qtdOriginal = (float) $compraItem->qtd_original;
+        $qtdAtual    = (float) $compraItem->qtd_atual;
 
-        if ($novoEstoque < 0) {
+        if ($qtdAtual < $qtdOriginal) {
             throw new Exception(
-                'Não é possível reverter a movimentação: estoque insuficiente para o item ' . $item->descricao,
+                'Não é possível reverter o lote: estoque parcialmente consumido.',
                 422
             );
         }
-
-        $payload = ['estoque' => $novoEstoque];
-
-        if ($item->gera_custo && $novoEstoque == 0) {
-            $payload['custo_medio'] = 0;
-        }
-
-        $this->_itemRepository->update($item, $payload);
     }
 }
