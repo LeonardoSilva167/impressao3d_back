@@ -6,6 +6,7 @@ use App\Models\PlataformaCompra;
 use App\Repositories\Compra\CompraRepository;
 use App\Repositories\CompraItem\CompraItemRepository;
 use App\Services\CompraItem\CompraItemEstoqueService;
+use App\Services\CompraItem\CompraItemService;
 use App\Services\PaginateService;
 use Exception;
 use Illuminate\Support\Facades\DB;
@@ -27,11 +28,17 @@ class CompraService
      */
     private CompraItemEstoqueService $_estoqueService;
 
+    /**
+     * @var CompraItemService $_compraItemService
+     */
+    private CompraItemService $_compraItemService;
+
     public function __construct()
     {
         $this->_repository            = new CompraRepository();
         $this->_compraItemRepository  = new CompraItemRepository();
         $this->_estoqueService        = new CompraItemEstoqueService();
+        $this->_compraItemService     = new CompraItemService();
     }
 
     // =========================================================
@@ -111,8 +118,10 @@ class CompraService
             $payload = $this->preparePayload($atributes);
             $newData = $this->_repository->create($payload);
 
+            $this->persistCompraItens($newData->id, $atributes->compra_itens);
+
             return (object) [
-                'data'    => $newData,
+                'data'    => $this->getCompraId($newData->id),
                 'status'  => true,
                 'message' => 'Compra cadastrada com sucesso!',
             ];
@@ -139,8 +148,11 @@ class CompraService
                 throw new Exception('Não foi possível editar Compra', 500);
             }
 
+            $this->_compraItemService->removeAllByCompraId($atributes->id);
+            $this->persistCompraItens($atributes->id, $atributes->compra_itens);
+
             return (object) [
-                'data'    => [],
+                'data'    => $this->getCompraId($atributes->id),
                 'status'  => true,
                 'message' => 'Compra alterada com sucesso!',
             ];
@@ -297,8 +309,9 @@ class CompraService
                 ->get()
                 ->toArray();
 
-            $data             = collect($record)->toArray();
-            $data['itens']    = $itens;
+            $data                  = collect($record)->toArray();
+            $data['compra_itens']  = $itens;
+            $data['itens']         = $itens;
 
             return $data;
         } catch (Exception $e) {
@@ -356,11 +369,19 @@ class CompraService
             'data_compra'          => $atributes->data_compra,
             'numero_pedido'        => $atributes->numero_pedido ?? null,
             'valor_frete'          => (float) ($atributes->valor_frete ?? 0),
-            'valor_desconto'       => (float) ($atributes->valor_desconto ?? 0),
+            'valor_desconto'       => (float) ($atributes->valor_desconto ?? $atributes->desconto ?? 0),
             'valor_taxa'           => (float) ($atributes->valor_taxa ?? 0),
             'valor_imposto'        => (float) ($atributes->valor_imposto ?? 0),
             'valor_total'          => (float) $atributes->valor_total,
             'observacao'           => $atributes->observacao ?? null,
         ];
+    }
+
+    private function persistCompraItens(int|string $idCompra, array $itens): void
+    {
+        foreach ($itens as $item) {
+            $itemAttributes = is_array($item) ? (object) $item : $item;
+            $this->_compraItemService->createItemForCompra($itemAttributes, (int) $idCompra);
+        }
     }
 }

@@ -52,7 +52,9 @@ class ItemService
         foreach ($termos as $termo) {
             $query->where(function ($q) use ($termo) {
                 $q->where('ent.descricao', 'like', '%' . $termo . '%')
-                    ->orWhere('ent.codigo', 'like', '%' . $termo . '%');
+                    ->orWhere('ent.codigo', 'like', '%' . $termo . '%')
+                    ->orWhere('cat.descricao', 'like', '%' . $termo . '%')
+                    ;
             });
         }
 

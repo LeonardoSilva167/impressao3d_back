@@ -2,11 +2,13 @@
 
 namespace App\Http\Requests\Compra;
 
+use App\Http\Requests\Compra\Concerns\ValidatesCompraItens;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
 class CompraEditarRequest extends FormRequest
 {
+    use ValidatesCompraItens;
     public function authorize(): bool
     {
         return true;
@@ -16,15 +18,16 @@ class CompraEditarRequest extends FormRequest
     {
         $this->merge([
             'valor_frete'    => $this->input('valor_frete') ?? 0,
-            'valor_desconto' => $this->input('valor_desconto') ?? 0,
+            'valor_desconto' => $this->input('valor_desconto') ?? $this->input('desconto') ?? 0,
             'valor_taxa'     => $this->input('valor_taxa') ?? 0,
             'valor_imposto'  => $this->input('valor_imposto') ?? 0,
+            'compra_itens'   => $this->input('compra_itens') ?? [],
         ]);
     }
 
     public function rules(): array
     {
-        return [
+        return array_merge([
             'id'                   => ['required', 'integer', Rule::exists('compras', 'id')->whereNull('deleted_at')],
             'id_plataforma_compra' => ['required', 'integer', Rule::exists('plataforma_compras', 'id')->whereNull('deleted_at')],
             'data_compra'          => ['required', 'date'],
@@ -35,12 +38,12 @@ class CompraEditarRequest extends FormRequest
             'valor_imposto'        => ['required', 'numeric', 'min:0'],
             'valor_total'          => ['required', 'numeric', 'min:0'],
             'observacao'           => ['nullable', 'string'],
-        ];
+        ], $this->compraItensRules());
     }
 
     public function messages(): array
     {
-        return [
+        return array_merge([
             'id.required'                   => 'O identificador da compra é obrigatório.',
             'id.exists'                     => 'A compra informada não existe.',
             'id_plataforma_compra.required' => 'A plataforma de compra é obrigatória.',
@@ -52,6 +55,6 @@ class CompraEditarRequest extends FormRequest
             'valor_taxa.required'           => 'O valor da taxa é obrigatório.',
             'valor_imposto.required'        => 'O valor do imposto é obrigatório.',
             'valor_total.required'          => 'O valor total é obrigatório.',
-        ];
+        ], $this->compraItensMessages());
     }
 }

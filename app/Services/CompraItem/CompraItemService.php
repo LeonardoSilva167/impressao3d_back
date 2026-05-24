@@ -3,6 +3,7 @@
 namespace App\Services\CompraItem;
 
 use App\Models\Compra;
+use App\Models\CompraItem;
 use App\Models\Item;
 use App\Repositories\CompraItem\CompraItemRepository;
 use App\Services\PaginateService;
@@ -176,6 +177,29 @@ class CompraItemService
             ];
         } catch (Exception $e) {
             throw $e;
+        }
+    }
+
+    public function createItemForCompra(object $attributes, int $idCompra): CompraItem
+    {
+        $this->validateItem((int) $attributes->id_item);
+
+        $attributesWithCompra = (object) array_merge((array) $attributes, ['id_compra' => $idCompra]);
+        $payload              = $this->preparePayload($attributesWithCompra);
+        $newData              = $this->_repository->create($payload);
+
+        $this->_estoqueService->aplicarMovimentacao($newData);
+
+        return $newData;
+    }
+
+    public function removeAllByCompraId(int|string $idCompra): void
+    {
+        $itens = $this->_repository->findByCompraId($idCompra);
+
+        foreach ($itens as $compraItem) {
+            $this->_estoqueService->reverterMovimentacao($compraItem);
+            $this->_repository->delete($compraItem);
         }
     }
 
@@ -363,45 +387,25 @@ class CompraItemService
 
     private function preparePayload(object $atributes): array
     {
-        $item       = $this->findItemWithCategoria((int) $atributes->id_item);
-        $isFilamento = $this->isItemFilamento($item);
+        if (!isset($atributes->qtd_interna)) {
+            throw new Exception('A quantidade interna é obrigatória.', 422);
+        }
 
         $qtdCompra           = (float) $atributes->qtd_compra;
         $valorUnitarioCompra = (float) $atributes->valor_unitario_compra;
+        $qtdInterna          = (float) $atributes->qtd_interna;
+        $gramaturaFilamento  = isset($atributes->gramatura_filamento) && $atributes->gramatura_filamento !== null
+            ? (int) $atributes->gramatura_filamento
+            : null;
 
-        if ($isFilamento) {
-            if (!isset($atributes->gramatura_filamento)) {
-                throw new Exception('A gramatura do filamento é obrigatória.', 422);
-            }
-
-            $gramaturaFilamento = (int) $atributes->gramatura_filamento;
-
-            if (!in_array($gramaturaFilamento, [500, 1000], true)) {
-                throw new Exception('A gramatura do filamento deve ser 500 ou 1000.', 422);
-            }
-
-            if (isset($atributes->qtd_interna)) {
-                throw new Exception('A quantidade interna de filamentos é calculada automaticamente.', 422);
-            }
-
-            $qtdInterna = $qtdCompra * $gramaturaFilamento;
-        } else {
-            if (isset($atributes->gramatura_filamento) && $atributes->gramatura_filamento !== null) {
-                throw new Exception('Gramatura de filamento não se aplica a este item.', 422);
-            }
-
-            if (!isset($atributes->qtd_interna)) {
-                throw new Exception('A quantidade interna é obrigatória.', 422);
-            }
-
-            $qtdInterna         = (float) $atributes->qtd_interna;
-            $gramaturaFilamento = null;
+        if ($gramaturaFilamento !== null && !in_array($gramaturaFilamento, [500, 1000], true)) {
+            throw new Exception('A gramatura do filamento deve ser 500 ou 1000.', 422);
         }
 
         $valorTotal        = round($qtdCompra * $valorUnitarioCompra, 2);
         $valorUnitarioReal = round($valorTotal / $qtdInterna, 4);
 
-        $payload = [
+        return [
             'id_compra'             => (int) $atributes->id_compra,
             'id_item'               => (int) $atributes->id_item,
             'qtd_compra'            => $qtdCompra,
@@ -409,28 +413,7 @@ class CompraItemService
             'valor_unitario_compra' => $valorUnitarioCompra,
             'valor_total'           => $valorTotal,
             'valor_unitario_real'   => $valorUnitarioReal,
-            'gramatura_filamento'   => $gramaturaFilamento ?? null,
+            'gramatura_filamento'   => $gramaturaFilamento,
         ];
-
-        return $payload;
-    }
-
-    private function findItemWithCategoria(int $idItem): Item
-    {
-        $item = Item::with('categoriaItem')
-            ->where('id', $idItem)
-            ->whereNull('deleted_at')
-            ->first();
-
-        if (!$item) {
-            throw new Exception('Item não encontrado', 422);
-        }
-
-        return $item;
-    }
-
-    private function isItemFilamento(Item $item): bool
-    {
-        return $item->categoriaItem?->descricao === 'FILAMENTO';
     }
 }
