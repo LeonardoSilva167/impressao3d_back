@@ -4,6 +4,7 @@ namespace App\Services\CompraItem;
 
 use App\Models\CompraItem;
 use App\Repositories\CompraItem\CompraItemRepository;
+use App\Services\Estoque\MovimentacaoEstoqueService;
 use App\Services\Item\ItemEstoqueRecalculoService;
 use Exception;
 
@@ -19,15 +20,26 @@ class CompraItemEstoqueService
      */
     private ItemEstoqueRecalculoService $_recalculoService;
 
+    /**
+     * @var MovimentacaoEstoqueService $_movimentacaoService
+     */
+    private MovimentacaoEstoqueService $_movimentacaoService;
+
     public function __construct()
     {
         $this->_compraItemRepository = new CompraItemRepository();
         $this->_recalculoService     = new ItemEstoqueRecalculoService();
+        $this->_movimentacaoService  = new MovimentacaoEstoqueService();
     }
 
-    public function aplicarMovimentacao(CompraItem $compraItem): void
+    public function aplicarMovimentacao(CompraItem $compraItem, bool $registrarEntrada = false): void
     {
         $this->validarLote($compraItem);
+
+        if ($registrarEntrada) {
+            $this->_movimentacaoService->registrarEntradaCompra($compraItem);
+        }
+
         $this->_recalculoService->recalcularItem($compraItem->id_item);
     }
 

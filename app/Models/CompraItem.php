@@ -25,6 +25,10 @@ class CompraItem extends Model
         'valor_unitario_real',
     ];
 
+    protected $appends = [
+        'percentual_utilizado',
+    ];
+
     protected $casts = [
         'id'                    => 'integer',
         'id_compra'             => 'integer',
@@ -52,5 +56,32 @@ class CompraItem extends Model
     public function item()
     {
         return $this->belongsTo(Item::class, 'id_item');
+    }
+
+    public function getPercentualUtilizadoAttribute(): float
+    {
+        $qtdOriginal = (float) $this->qtd_original;
+
+        if ($qtdOriginal <= 0) {
+            return 0;
+        }
+
+        $qtdAtual = (float) $this->qtd_atual;
+
+        return round((($qtdOriginal - $qtdAtual) / $qtdOriginal) * 100, 2);
+    }
+
+    public static function calcularPercentualUtilizado(float $qtdOriginal, float $qtdAtual): float
+    {
+        if ($qtdOriginal <= 0) {
+            return 0;
+        }
+
+        return round((($qtdOriginal - $qtdAtual) / $qtdOriginal) * 100, 2);
+    }
+
+    public static function calcularStatus(float $qtdAtual): string
+    {
+        return $qtdAtual > 0 ? 'ATIVO' : 'ZERADO';
     }
 }

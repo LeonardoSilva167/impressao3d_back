@@ -70,4 +70,14 @@ class CompraItemRepository
             ->lockForUpdate()
             ->get();
     }
+
+    public function findLoteMaisAntigoComEstoque(int|string $idItem): ?CompraItem
+    {
+        return CompraItem::where('id_item', $idItem)
+            ->whereNull('deleted_at')
+            ->where('qtd_atual', '>', 0)
+            ->orderBy('created_at')
+            ->orderBy('id')
+            ->first();
+    }
 }

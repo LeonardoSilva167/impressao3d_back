@@ -107,7 +107,7 @@ class CompraItemService
             $payload = $this->preparePayload($atributes);
             $newData = $this->_repository->create($payload);
 
-            $this->_estoqueService->aplicarMovimentacao($newData);
+            $this->_estoqueService->aplicarMovimentacao($newData, true);
 
             return (object) [
                 'data'    => $newData->fresh(),
@@ -188,7 +188,7 @@ class CompraItemService
         $payload              = $this->preparePayload($attributesWithCompra);
         $newData              = $this->_repository->create($payload);
 
-        $this->_estoqueService->aplicarMovimentacao($newData);
+        $this->_estoqueService->aplicarMovimentacao($newData, true);
 
         return $newData;
     }
