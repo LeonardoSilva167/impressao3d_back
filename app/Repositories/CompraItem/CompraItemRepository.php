@@ -19,6 +19,14 @@ class CompraItemRepository
             ->get();
     }
 
+    public function findByIdForUpdate(int|string $id): ?CompraItem
+    {
+        return CompraItem::where('id', $id)
+            ->whereNull('deleted_at')
+            ->lockForUpdate()
+            ->first();
+    }
+
     public function create(array $data): CompraItem
     {
         return CompraItem::create($data);
