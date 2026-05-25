@@ -2,8 +2,10 @@
 
 namespace App\Http\Controllers;
 
+use App\Exceptions\EstoqueInsuficienteException;
 use App\Http\Requests\CarreteisFinalizado\CarreteisFinalizadoCadastrarRequest;
 use App\Http\Requests\CarreteisFinalizado\CarreteisFinalizadoEditarRequest;
+use App\Http\Requests\CarreteisFinalizado\CarreteisFinalizadoLotesConsumoRequest;
 use App\Services\CarreteisFinalizado\CarreteisFinalizadoService;
 use App\Services\RequestDataService;
 use Exception;
@@ -115,23 +117,24 @@ class CarreteisFinalizadoController extends Controller
         }
     }
 
-    public function loteMaisAntigo(string $idItem)
+    public function listarLotesConsumo(CarreteisFinalizadoLotesConsumoRequest $request)
     {
         try {
-            $result = $this->_service->getLoteMaisAntigoByItemId($idItem);
-            return response()->json($result, 200);
-        } catch (Exception $ex) {
-            $statusCode = is_numeric($ex->getCode()) ? (int) $ex->getCode() : 500;
-            $statusCode = ($statusCode >= 100 && $statusCode <= 599) ? $statusCode : 500;
-            return response()->json(['error' => true, 'message' => $ex->getMessage()], $statusCode);
-        }
-    }
+            $request->validated();
 
-    public function loteMaisAntigoFilamento(string $idFilamento)
-    {
-        try {
-            $result = $this->_service->getLoteMaisAntigoByFilamentoId($idFilamento);
+            $idItem     = (int) $request->query('id_item');
+            $gramatura  = (int) $request->query('gramatura');
+            $quantidade = (int) $request->query('quantidade');
+
+            $result = $this->_service->getLotesConsumo($idItem, $quantidade, $gramatura);
+
             return response()->json($result, 200);
+        } catch (EstoqueInsuficienteException $ex) {
+            return response()->json([
+                'error'                => true,
+                'estoque_insuficiente' => true,
+                'message'              => $ex->getMessage(),
+            ], 422);
         } catch (Exception $ex) {
             $statusCode = is_numeric($ex->getCode()) ? (int) $ex->getCode() : 500;
             $statusCode = ($statusCode >= 100 && $statusCode <= 599) ? $statusCode : 500;

@@ -7,7 +7,6 @@ use App\Models\Filamento;
 use App\Models\Item;
 use App\Models\MovimentacaoEstoque;
 use App\Repositories\CarreteisFinalizado\CarreteisFinalizadoRepository;
-use App\Repositories\CompraItem\CompraItemRepository;
 use App\Repositories\Item\ItemRepository;
 use App\Repositories\MovimentacaoEstoque\MovimentacaoEstoqueRepository;
 use App\Services\Item\ItemEstoqueRecalculoService;
@@ -28,11 +27,6 @@ class CarreteisFinalizadoService
     private ItemRepository $_itemRepository;
 
     /**
-     * @var CompraItemRepository $_compraItemRepository
-     */
-    private CompraItemRepository $_compraItemRepository;
-
-    /**
      * @var MovimentacaoEstoqueRepository $_movimentacaoRepository
      */
     private MovimentacaoEstoqueRepository $_movimentacaoRepository;
@@ -46,7 +40,6 @@ class CarreteisFinalizadoService
     {
         $this->_repository             = new CarreteisFinalizadoRepository();
         $this->_itemRepository         = new ItemRepository();
-        $this->_compraItemRepository   = new CompraItemRepository();
         $this->_movimentacaoRepository = new MovimentacaoEstoqueRepository();
         $this->_recalculoService       = new ItemEstoqueRecalculoService();
     }
@@ -362,32 +355,23 @@ class CarreteisFinalizadoService
         ];
     }
 
-    public function getLoteMaisAntigoByItemId(int|string $idItem): object
+    /**
+     * @return array<int, array{
+     *     id_compra_item: int,
+     *     compra: string,
+     *     plataforma: string|null,
+     *     data_compra: mixed,
+     *     saldo_atual: float,
+     *     qtd_consumida: float,
+     *     saldo_restante: float,
+     *     valor_unitario_real: float
+     * }>
+     */
+    public function getLotesConsumo(int $idItem, int $quantidade, int $gramatura): array
     {
-        $item = $this->resolveItem((int) $idItem);
+        $item = $this->resolveItem($idItem);
 
-        return (object) [
-            'data' => $this->buscarLoteMaisAntigo($item->id),
-        ];
-    }
-
-    public function getLoteMaisAntigoByFilamentoId(int|string $idFilamento): object
-    {
-        $filamento = Filamento::where('id', $idFilamento)
-            ->whereNull('deleted_at')
-            ->first();
-
-        if (!$filamento) {
-            throw new Exception('Filamento não encontrado', 404);
-        }
-
-        if (!$filamento->id_item) {
-            throw new Exception('Filamento sem item vinculado.', 422);
-        }
-
-        return (object) [
-            'data' => $this->buscarLoteMaisAntigo((int) $filamento->id_item),
-        ];
+        return $this->simularConsumoFifo($item->id, $quantidade, $gramatura);
     }
 
     public function getCarreteisFinalizadoAsync(object $params): array
@@ -423,17 +407,37 @@ class CarreteisFinalizadoService
     // HELPERS
     // =========================================================
 
-    private function buscarLoteMaisAntigo(int $idItem): array
+    /**
+     * @return array<int, array{
+     *     id_compra_item: int,
+     *     compra: string,
+     *     plataforma: string|null,
+     *     data_compra: mixed,
+     *     saldo_atual: float,
+     *     qtd_consumida: float,
+     *     saldo_restante: float,
+     *     valor_unitario_real: float
+     * }>
+     */
+    private function simularConsumoFifo(int $idItem, int $quantidade, int $gramatura): array
     {
-        $lote = $this->_compraItemRepository
-            ->findLoteMaisAntigoComEstoque($idItem)
-            ?->load(['compra.plataformaCompra']);
+        $this->validarGramatura($gramatura);
+        $this->validarQuantidade($quantidade);
 
-        if (!$lote) {
+        $qtdTotalConsumida = round($quantidade * $gramatura, 4);
+        $lotesSimulados    = $this->_recalculoService->simularDebitoEstoqueFifo(
+            $idItem,
+            $qtdTotalConsumida
+        );
+
+        if (empty($lotesSimulados)) {
             throw new Exception('Não há lotes com saldo disponível para este item.', 422);
         }
 
-        return $this->formatarLoteMaisAntigo($lote);
+        return array_map(
+            fn (array $lote) => $this->formatarLoteConsumoFifo($lote),
+            $lotesSimulados
+        );
     }
 
     private function resolveItem(int $idItem): Item
@@ -717,27 +721,17 @@ class CarreteisFinalizadoService
         ];
     }
 
-    private function formatarLoteMaisAntigo($lote): array
+    private function formatarLoteConsumoFifo(array $lote): array
     {
-        $compra = $lote->compra;
-
         return [
-            'lote' => [
-                'id'                  => $lote->id,
-                'qtd_original'        => $lote->qtd_original,
-                'qtd_atual'           => $lote->qtd_atual,
-                'valor_unitario_real' => $lote->valor_unitario_real,
-                'gramatura_filamento' => $lote->gramatura_filamento,
-            ],
-            'compra' => $compra ? [
-                'id'            => $compra->id,
-                'numero_pedido' => $compra->numero_pedido,
-                'data_compra'   => $compra->data_compra,
-                'plataforma'    => $compra->plataformaCompra ? [
-                    'id'        => $compra->plataformaCompra->id,
-                    'descricao' => $compra->plataformaCompra->descricao,
-                ] : null,
-            ] : null,
+            'id_compra_item'      => $lote['id_compra_item'],
+            'compra'              => (string) $lote['id_compra'],
+            'plataforma'          => $lote['plataforma'],
+            'data_compra'         => $lote['data_compra'],
+            'saldo_atual'         => $lote['saldo_atual'],
+            'qtd_consumida'       => $lote['qtd_consumida'],
+            'saldo_restante'      => $lote['saldo_restante'],
+            'valor_unitario_real' => $lote['valor_unitario_real'],
         ];
     }
 }

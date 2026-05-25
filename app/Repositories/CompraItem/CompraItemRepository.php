@@ -4,6 +4,7 @@ namespace App\Repositories\CompraItem;
 
 use App\Models\Compra;
 use App\Models\CompraItem;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 
 class CompraItemRepository
@@ -75,21 +76,24 @@ class CompraItemRepository
 
     public function findLotesComEstoqueByItemIdOrderedFifo(int|string $idItem): Collection
     {
-        return CompraItem::query()
-            ->join('compras as comp', 'comp.id', '=', 'compras_itens.id_compra')
-            ->where('compras_itens.id_item', $idItem)
-            ->whereNull('compras_itens.deleted_at')
-            ->whereNull('comp.deleted_at')
-            ->where('comp.status', Compra::STATUS_ATIVA)
-            ->where('compras_itens.qtd_atual', '>', 0)
-            ->orderBy('compras_itens.created_at')
-            ->orderBy('compras_itens.id')
-            ->select('compras_itens.*')
+        return $this->queryLotesComEstoqueFifo($idItem)
             ->lockForUpdate()
             ->get();
     }
 
+    public function findLotesComEstoqueByItemIdOrderedFifoReadOnly(int|string $idItem): Collection
+    {
+        return $this->queryLotesComEstoqueFifo($idItem)
+            ->with(['compra.plataformaCompra'])
+            ->get();
+    }
+
     public function findLoteMaisAntigoComEstoque(int|string $idItem): ?CompraItem
+    {
+        return $this->queryLotesComEstoqueFifo($idItem)->first();
+    }
+
+    private function queryLotesComEstoqueFifo(int|string $idItem): Builder
     {
         return CompraItem::query()
             ->join('compras as comp', 'comp.id', '=', 'compras_itens.id_compra')
@@ -98,9 +102,8 @@ class CompraItemRepository
             ->whereNull('comp.deleted_at')
             ->where('comp.status', Compra::STATUS_ATIVA)
             ->where('compras_itens.qtd_atual', '>', 0)
-            ->orderBy('compras_itens.created_at')
+            ->orderBy('comp.data_compra')
             ->orderBy('compras_itens.id')
-            ->select('compras_itens.*')
-            ->first();
+            ->select('compras_itens.*');
     }
 }

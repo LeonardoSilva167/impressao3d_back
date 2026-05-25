@@ -2,6 +2,7 @@
 
 namespace App\Services\Item;
 
+use App\Exceptions\EstoqueInsuficienteException;
 use App\Repositories\CompraItem\CompraItemRepository;
 use App\Repositories\Item\ItemRepository;
 use Exception;
@@ -150,13 +151,74 @@ class ItemEstoqueRecalculoService
         }
 
         if ($restante > 0) {
-            throw new Exception(
-                'Estoque insuficiente para o item ' . $item->descricao,
-                422
-            );
+            throw new EstoqueInsuficienteException();
         }
 
         $this->recalcularItem($idItem);
+
+        return $detalhes;
+    }
+
+    /**
+     * Simula débito FIFO sem alterar estoque — usado na pré-visualização de consumo.
+     *
+     * @return array<int, array{
+     *     id_compra_item: int,
+     *     id_compra: int,
+     *     plataforma: string|null,
+     *     data_compra: mixed,
+     *     saldo_atual: float,
+     *     qtd_consumida: float,
+     *     saldo_restante: float,
+     *     valor_unitario_real: float
+     * }>
+     */
+    public function simularDebitoEstoqueFifo(int|string $idItem, float $quantidade): array
+    {
+        if ($quantidade <= 0) {
+            throw new Exception('Quantidade para débito deve ser maior que zero.', 422);
+        }
+
+        $item = $this->_itemRepository->findById($idItem);
+
+        if (!$item) {
+            throw new Exception('Item não encontrado', 422);
+        }
+
+        if (!$item->controla_estoque) {
+            return [];
+        }
+
+        $restante = round($quantidade, 4);
+        $lotes    = $this->_compraItemRepository->findLotesComEstoqueByItemIdOrderedFifoReadOnly($idItem);
+        $detalhes = [];
+
+        foreach ($lotes as $lote) {
+            if ($restante <= 0) {
+                break;
+            }
+
+            $saldoAtual     = round((float) $lote->qtd_atual, 4);
+            $qtdConsumida   = round(min($saldoAtual, $restante), 4);
+            $saldoRestante  = round($saldoAtual - $qtdConsumida, 4);
+
+            $detalhes[] = [
+                'id_compra_item'      => (int) $lote->id,
+                'id_compra'           => (int) $lote->id_compra,
+                'plataforma'          => $lote->compra?->plataformaCompra?->descricao,
+                'data_compra'         => $lote->compra?->data_compra,
+                'saldo_atual'         => $saldoAtual,
+                'qtd_consumida'       => $qtdConsumida,
+                'saldo_restante'      => $saldoRestante,
+                'valor_unitario_real' => round((float) $lote->valor_unitario_real, 4),
+            ];
+
+            $restante = round($restante - $qtdConsumida, 4);
+        }
+
+        if ($restante > 0) {
+            throw new EstoqueInsuficienteException();
+        }
 
         return $detalhes;
     }
