@@ -84,6 +84,24 @@ class MovimentacaoEstoqueService
         ]);
     }
 
+    public function registrarCancelamentoCompra(
+        CompraItem $compraItem,
+        float $quantidadeRemovida,
+        float $saldoAnterior,
+        float $saldoPosterior
+    ): MovimentacaoEstoque {
+        return $this->_repository->create([
+            'id_item'           => $compraItem->id_item,
+            'id_compra_item'    => $compraItem->id,
+            'tipo_movimentacao' => MovimentacaoEstoque::TIPO_CANCELAMENTO_COMPRA,
+            'qtd'               => $quantidadeRemovida,
+            'saldo_anterior'    => $saldoAnterior,
+            'saldo_posterior'   => $saldoPosterior,
+            'observacao'        => 'Cancelamento da compra #' . $compraItem->id_compra,
+            'data_movimentacao' => now(),
+        ]);
+    }
+
     public function consumirFilamento(object $atributes): object
     {
         $filamento = $this->resolveFilamento((int) $atributes->id_filamento);

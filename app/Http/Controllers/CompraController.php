@@ -90,6 +90,18 @@ class CompraController extends Controller
         }
     }
 
+    public function cancelarCompra(string $id)
+    {
+        try {
+            $result = $this->_service->handleCancelarCompra($id);
+            return response()->json($result, 200);
+        } catch (Exception $ex) {
+            $statusCode = is_numeric($ex->getCode()) ? (int) $ex->getCode() : 500;
+            $statusCode = ($statusCode >= 100 && $statusCode <= 599) ? $statusCode : 500;
+            return response()->json(['error' => true, 'message' => $ex->getMessage()], $statusCode);
+        }
+    }
+
     public function deleteCompra(string $id)
     {
         try {

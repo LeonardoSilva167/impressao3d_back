@@ -16,6 +16,7 @@ class LoteService
             'ent.id_compra',
             'comp.data_compra',
             'comp.numero_pedido',
+            'comp.status as compra_status',
             'ent.id_item',
             'item.descricao as item_descricao',
             'item.codigo as item_codigo',
@@ -122,6 +123,7 @@ class LoteService
             'compra'                => [
                 'id'             => $row['id_compra'],
                 'numero_pedido'  => $row['numero_pedido'],
+                'status'         => $row['compra_status'] ?? null,
             ],
             'filamento'             => !empty($row['id_filamento']) ? [
                 'id'     => $row['id_filamento'],

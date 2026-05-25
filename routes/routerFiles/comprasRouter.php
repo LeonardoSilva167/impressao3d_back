@@ -8,5 +8,5 @@ Route::get('/listar',          [CompraController::class, 'listarCompra']);
 Route::get('/listar/{id}',     [CompraController::class, 'listarCompraId']);
 Route::post('/cadastrar',      [CompraController::class, 'createCompra']);
 Route::put('/editar',          [CompraController::class, 'editCompra']);
-Route::delete('/excluir/{id}', [CompraController::class, 'deleteCompra']);
+Route::post('/{id}/cancelar',  [CompraController::class, 'cancelarCompra']);
 Route::get('/compras-list',    [CompraController::class, 'listarCompraAsync']);

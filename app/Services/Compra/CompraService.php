@@ -2,9 +2,9 @@
 
 namespace App\Services\Compra;
 
+use App\Models\Compra;
 use App\Models\PlataformaCompra;
 use App\Repositories\Compra\CompraRepository;
-use App\Repositories\CompraItem\CompraItemRepository;
 use App\Services\CompraItem\CompraItemEstoqueService;
 use App\Services\CompraItem\CompraItemService;
 use App\Services\PaginateService;
@@ -19,11 +19,6 @@ class CompraService
     private CompraRepository $_repository;
 
     /**
-     * @var CompraItemRepository $_compraItemRepository
-     */
-    private CompraItemRepository $_compraItemRepository;
-
-    /**
      * @var CompraItemEstoqueService $_estoqueService
      */
     private CompraItemEstoqueService $_estoqueService;
@@ -36,7 +31,6 @@ class CompraService
     public function __construct()
     {
         $this->_repository            = new CompraRepository();
-        $this->_compraItemRepository  = new CompraItemRepository();
         $this->_estoqueService        = new CompraItemEstoqueService();
         $this->_compraItemService     = new CompraItemService();
     }
@@ -81,6 +75,22 @@ class CompraService
 
             $result         = (object) [];
             $result->compra = $this->updateCompra($atributes);
+
+            DB::commit();
+            return $result;
+        } catch (Exception $e) {
+            DB::rollback();
+            throw $e;
+        }
+    }
+
+    public function handleCancelarCompra(int|string $id): object
+    {
+        try {
+            DB::beginTransaction();
+
+            $result         = (object) [];
+            $result->compra = $this->cancelarCompra($id);
 
             DB::commit();
             return $result;
@@ -139,6 +149,8 @@ class CompraService
                 throw new Exception('Compra não encontrada', 404);
             }
 
+            $this->validarCompraAtiva($record);
+
             $this->validatePlataformaCompra((int) $atributes->id_plataforma_compra);
 
             $payload = $this->preparePayload($atributes);
@@ -163,6 +175,14 @@ class CompraService
 
     public function deleteCompra(int|string $id): object
     {
+        throw new Exception(
+            'Compras não podem ser excluídas fisicamente. Utilize o cancelamento lógico.',
+            422
+        );
+    }
+
+    public function cancelarCompra(int|string $id): object
+    {
         try {
             $record = $this->_repository->findById($id);
 
@@ -170,23 +190,22 @@ class CompraService
                 throw new Exception('Compra não encontrada', 404);
             }
 
-            $itens = $this->_compraItemRepository->findByCompraId($id);
-
-            foreach ($itens as $compraItem) {
-                $this->_estoqueService->reverterMovimentacao($compraItem);
-                $this->_compraItemRepository->delete($compraItem);
+            if ($record->status === Compra::STATUS_CANCELADA) {
+                throw new Exception('Esta compra já está cancelada.', 422);
             }
 
-            $saved = $this->_repository->delete($record);
+            $this->_estoqueService->cancelarLotesDaCompra($id);
+
+            $saved = $this->_repository->update($record, ['status' => Compra::STATUS_CANCELADA]);
 
             if (!$saved) {
-                throw new Exception('Não foi possível excluir Compra', 500);
+                throw new Exception('Não foi possível cancelar a Compra', 500);
             }
 
             return (object) [
-                'data'    => [],
+                'data'    => $this->getCompraId($id),
                 'status'  => true,
-                'message' => 'Compra excluída com sucesso!',
+                'message' => 'Compra cancelada com sucesso!',
             ];
         } catch (Exception $e) {
             throw $e;
@@ -213,8 +232,11 @@ class CompraService
             'ent.valor_imposto',
             'ent.valor_total',
             'ent.observacao',
+            'ent.status',
             'ent.created_at',
         );
+
+        $query->selectRaw('ent.status as badge_status');
 
         $query->from('compras as ent');
         $query->join('plataforma_compras as plat', 'plat.id', '=', 'ent.id_plataforma_compra');
@@ -236,6 +258,14 @@ class CompraService
             $query->where(function ($q) use ($chave) {
                 $q->where('ent.numero_pedido', 'like', '%' . $chave . '%');
             });
+        }
+
+        if (!empty($atributes->status)) {
+            $status = strtoupper((string) $atributes->status);
+
+            if (in_array($status, [Compra::STATUS_ATIVA, Compra::STATUS_CANCELADA], true)) {
+                $query->where('ent.status', $status);
+            }
         }
 
         if (!empty($atributes->palavra_chave)) {
@@ -271,13 +301,15 @@ class CompraService
                     'ent.data_compra',
                     'ent.numero_pedido',
                     'ent.valor_frete',
-                    'ent.valor_desconto',
+                    'ent.valor_desconto as desconto',
                     'ent.valor_taxa',
                     'ent.valor_imposto',
                     'ent.valor_total',
                     'ent.observacao',
+                    'ent.status',
                     'ent.created_at',
                 )
+                ->selectRaw('ent.status as badge_status')
                 ->whereNull('ent.deleted_at')
                 ->whereNull('plat.deleted_at')
                 ->where('ent.id', $id);
@@ -298,6 +330,8 @@ class CompraService
                     'item.unidade_medida as item_unidade_medida',
                     'ci.qtd_compra',
                     'ci.qtd_interna',
+                    'ci.qtd_original',
+                    'ci.qtd_atual',
                     'ci.valor_unitario_compra',
                     'ci.valor_total',
                     'ci.valor_unitario_real',
@@ -309,9 +343,46 @@ class CompraService
                 ->get()
                 ->toArray();
 
-            $data                  = collect($record)->toArray();
-            $data['compra_itens']  = $itens;
-            $data['itens']         = $itens;
+            $idsCompraItens = array_column($itens, 'id');
+            $idsItens       = array_values(array_unique(array_column($itens, 'id_item')));
+
+            $movimentacoes = DB::table('movimentacoes_estoque as mov')
+                ->join('itens as item', 'item.id', '=', 'mov.id_item')
+                ->select(
+                    'mov.id',
+                    'mov.id_item',
+                    'item.descricao as item_descricao',
+                    'mov.id_compra_item',
+                    'mov.tipo_movimentacao',
+                    'mov.qtd',
+                    'mov.saldo_anterior',
+                    'mov.saldo_posterior',
+                    'mov.observacao',
+                    'mov.data_movimentacao',
+                    'mov.created_at',
+                )
+                ->where(function ($query) use ($idsCompraItens, $idsItens, $id) {
+                    if (!empty($idsCompraItens)) {
+                        $query->whereIn('mov.id_compra_item', $idsCompraItens);
+                    }
+
+                    if (!empty($idsItens)) {
+                        $query->orWhere(function ($sub) use ($idsItens, $id) {
+                            $sub->where('mov.tipo_movimentacao', 'ENTRADA_COMPRA')
+                                ->whereIn('mov.id_item', $idsItens)
+                                ->where('mov.observacao', 'Entrada via compra #' . $id);
+                        });
+                    }
+                })
+                ->orderByDesc('mov.data_movimentacao')
+                ->orderByDesc('mov.id')
+                ->get()
+                ->toArray();
+
+            $data                     = collect($record)->toArray();
+            $data['compra_itens']     = $itens;
+            $data['itens']            = $itens;
+            $data['movimentacoes']    = $movimentacoes;
 
             return $data;
         } catch (Exception $e) {
@@ -330,8 +401,10 @@ class CompraService
                 'ent.data_compra',
                 'ent.numero_pedido',
                 'ent.valor_total',
+                'ent.status',
                 'plat.descricao as plataforma_compra_descricao',
             )
+            ->where('ent.status', Compra::STATUS_ATIVA)
             ->orderByDesc('ent.data_compra')
             ->orderByDesc('ent.id');
 
@@ -359,6 +432,13 @@ class CompraService
 
         if (!$exists) {
             throw new Exception('Plataforma de Compra não encontrada', 422);
+        }
+    }
+
+    private function validarCompraAtiva(Compra $compra): void
+    {
+        if ($compra->status === Compra::STATUS_CANCELADA) {
+            throw new Exception('Não é possível alterar uma compra cancelada.', 422);
         }
     }
 

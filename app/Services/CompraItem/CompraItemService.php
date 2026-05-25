@@ -36,6 +36,7 @@ class CompraItemService
     {
         return [
             'compras' => Compra::whereNull('deleted_at')
+                ->where('status', Compra::STATUS_ATIVA)
                 ->orderByDesc('data_compra')
                 ->orderByDesc('id')
                 ->get(['id', 'data_compra', 'numero_pedido', 'valor_total']),
@@ -371,12 +372,16 @@ class CompraItemService
 
     private function validateCompra(int $idCompra): void
     {
-        $exists = Compra::where('id', $idCompra)
+        $compra = Compra::where('id', $idCompra)
             ->whereNull('deleted_at')
-            ->exists();
+            ->first();
 
-        if (!$exists) {
+        if (!$compra) {
             throw new Exception('Compra não encontrada', 422);
+        }
+
+        if ($compra->status === Compra::STATUS_CANCELADA) {
+            throw new Exception('Não é possível alterar itens de uma compra cancelada.', 422);
         }
     }
 

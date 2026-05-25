@@ -17,6 +17,7 @@ class MovimentacaoEstoque extends Model
     public const TIPO_AJUSTE               = 'AJUSTE';
     public const TIPO_FINALIZACAO_CARRETEL        = 'FINALIZACAO_CARRETEL';
     public const TIPO_ESTORNO_FINALIZACAO_CARRETEL  = 'ESTORNO_FINALIZACAO_CARRETEL';
+    public const TIPO_CANCELAMENTO_COMPRA           = 'CANCELAMENTO_COMPRA';
 
     public const TIPOS_SAIDA = [
         self::TIPO_SAIDA_VENDA,

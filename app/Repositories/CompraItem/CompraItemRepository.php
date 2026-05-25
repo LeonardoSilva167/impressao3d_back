@@ -2,6 +2,7 @@
 
 namespace App\Repositories\CompraItem;
 
+use App\Models\Compra;
 use App\Models\CompraItem;
 use Illuminate\Support\Collection;
 
@@ -44,9 +45,13 @@ class CompraItemRepository
 
     public function sumEstoqueEPrecoMedioByItemId(int|string $idItem): array
     {
-        $lotes = CompraItem::where('id_item', $idItem)
-            ->whereNull('deleted_at')
-            ->get(['qtd_atual', 'valor_unitario_real']);
+        $lotes = CompraItem::query()
+            ->join('compras as comp', 'comp.id', '=', 'compras_itens.id_compra')
+            ->where('compras_itens.id_item', $idItem)
+            ->whereNull('compras_itens.deleted_at')
+            ->whereNull('comp.deleted_at')
+            ->where('comp.status', Compra::STATUS_ATIVA)
+            ->get(['compras_itens.qtd_atual', 'compras_itens.valor_unitario_real']);
 
         $estoque   = 0;
         $somaCusto = 0;
@@ -70,22 +75,32 @@ class CompraItemRepository
 
     public function findLotesComEstoqueByItemIdOrderedFifo(int|string $idItem): Collection
     {
-        return CompraItem::where('id_item', $idItem)
-            ->whereNull('deleted_at')
-            ->where('qtd_atual', '>', 0)
-            ->orderBy('created_at')
-            ->orderBy('id')
+        return CompraItem::query()
+            ->join('compras as comp', 'comp.id', '=', 'compras_itens.id_compra')
+            ->where('compras_itens.id_item', $idItem)
+            ->whereNull('compras_itens.deleted_at')
+            ->whereNull('comp.deleted_at')
+            ->where('comp.status', Compra::STATUS_ATIVA)
+            ->where('compras_itens.qtd_atual', '>', 0)
+            ->orderBy('compras_itens.created_at')
+            ->orderBy('compras_itens.id')
+            ->select('compras_itens.*')
             ->lockForUpdate()
             ->get();
     }
 
     public function findLoteMaisAntigoComEstoque(int|string $idItem): ?CompraItem
     {
-        return CompraItem::where('id_item', $idItem)
-            ->whereNull('deleted_at')
-            ->where('qtd_atual', '>', 0)
-            ->orderBy('created_at')
-            ->orderBy('id')
+        return CompraItem::query()
+            ->join('compras as comp', 'comp.id', '=', 'compras_itens.id_compra')
+            ->where('compras_itens.id_item', $idItem)
+            ->whereNull('compras_itens.deleted_at')
+            ->whereNull('comp.deleted_at')
+            ->where('comp.status', Compra::STATUS_ATIVA)
+            ->where('compras_itens.qtd_atual', '>', 0)
+            ->orderBy('compras_itens.created_at')
+            ->orderBy('compras_itens.id')
+            ->select('compras_itens.*')
             ->first();
     }
 }

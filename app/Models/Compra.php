@@ -10,6 +10,9 @@ class Compra extends Model
 {
     use HasFactory, SoftDeletes;
 
+    public const STATUS_ATIVA     = 'ATIVA';
+    public const STATUS_CANCELADA = 'CANCELADA';
+
     protected $table = 'compras';
 
     protected $fillable = [
@@ -22,6 +25,7 @@ class Compra extends Model
         'valor_imposto',
         'valor_total',
         'observacao',
+        'status',
     ];
 
     protected $casts = [
@@ -33,6 +37,7 @@ class Compra extends Model
         'valor_taxa'           => 'decimal:2',
         'valor_imposto'        => 'decimal:2',
         'valor_total'          => 'decimal:2',
+        'status'               => 'string',
         'created_at'           => 'datetime',
         'updated_at'           => 'datetime',
         'deleted_at'           => 'datetime',
