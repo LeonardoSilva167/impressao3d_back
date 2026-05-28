@@ -27,6 +27,8 @@ Route::prefix('v1')->group(function () {
     Route::prefix('compras-itens')->group(function () {require __DIR__ . '/routerFiles/comprasItensRouter.php';});// Rota de Itens da Compra
     Route::prefix('estoque')->group(function () {require __DIR__ . '/routerFiles/estoqueRouter.php';});// Rota de Estoque e Lotes
     Route::prefix('carreteis-finalizados')->group(function () {require __DIR__ . '/routerFiles/carreteisFinalizadosRouter.php';});// Rota de Carretéis Finalizados
+    Route::prefix('projetos-impressao')->group(function () {require __DIR__ . '/routerFiles/projetosImpressaoRouter.php';});// Rota de Projetos de Impressão
+    Route::prefix('projetos-impressao-partes')->group(function () {require __DIR__ . '/routerFiles/projetosImpressaoPartesRouter.php';});// Rota de Partes do Projeto de Impressão
 // routes/api.php
 
 // Route::post('/pncp/edital', [PncpController::class, 'buscarEdital']);
