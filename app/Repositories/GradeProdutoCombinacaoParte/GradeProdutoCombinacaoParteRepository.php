@@ -43,6 +43,20 @@ class GradeProdutoCombinacaoParteRepository
             ->get();
     }
 
+    public function getDistinctParteIdsByGradeId(int $idGrade): array
+    {
+        return DB::table('grade_produto_combinacao_partes as gpcp')
+            ->join('grade_produto_combinacoes as gpc', 'gpc.id', '=', 'gpcp.id_grade_produto_combinacao')
+            ->where('gpc.id_grade_produto', $idGrade)
+            ->whereNull('gpcp.deleted_at')
+            ->whereNull('gpc.deleted_at')
+            ->distinct()
+            ->pluck('gpcp.id_parte_projeto')
+            ->map(fn ($id) => (int) $id)
+            ->values()
+            ->toArray();
+    }
+
     public function getByGradeId(int $idGrade): Collection
     {
         return DB::table('grade_produto_combinacao_partes as gpcp')

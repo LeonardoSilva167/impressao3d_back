@@ -38,6 +38,7 @@ Route::prefix('v1')->group(function () {
     Route::prefix('composicao-produtos')->group(function () {require __DIR__ . '/routerFiles/composicaoProdutosRouter.php';});// Rota de Composição de Produtos
     Route::prefix('grades-produtos')->group(function () {require __DIR__ . '/routerFiles/gradeProdutosRouter.php';});// Rota de Grade de Produtos
     Route::prefix('grade-produtos')->group(function () {require __DIR__ . '/routerFiles/gradeProdutosRouter.php';});// Alias legado
+    Route::prefix('configuracoes')->group(function () {require __DIR__ . '/routerFiles/configuracoesRouter.php';});// Rota de Configurações
     
     // Route::prefix('despesas')->group(function () {require __DIR__ . '/routerFiles/despesaRouter.php';});// Rota de despesas
     // Route::prefix('contas-pagar')->group(function () {require __DIR__ . '/routerFiles/contasPagarRouter.php';   });// Rota de contas-pagar

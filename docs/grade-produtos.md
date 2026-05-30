@@ -36,6 +36,16 @@ Uma grade possui **várias combinações**. Cada combinação é uma fórmula (p
 | descricao       | string  | Sim         |
 | status          | boolean | Sim (default true) |
 
+### `grade_produto_partes`
+
+Partes cobertas pela grade (união das partes usadas nas combinações). Alimenta o campo `nome_parte` na listagem (ex.: `Cuba + Tampa`).
+
+| Campo            | Tipo | Obrigatório |
+|------------------|------|-------------|
+| id               | int  | PK          |
+| id_grade_produto | FK   | Sim         |
+| id_parte_projeto | FK   | Sim         |
+
 ### `grade_produto_combinacoes`
 
 Fórmulas cadastradas na grade (ex.: Produto Completo, Kit Duplo, Somente Cuba).
@@ -96,8 +106,10 @@ Produtos finais gerados pela grade.
 | GET    | /lookups | Produtos base com flag `possui_composicao` |
 | GET    | /carregar-dados?id_produto_base= | Carrega composição do produto (sem projeto) |
 | GET    | /carregar-composicao?id_produto_base= | Alias de `/carregar-dados` |
-| GET    | /listar | Listagem paginada |
-| GET    | /listar/{id} | Detalhe com composição, combinações e produtos gerados |
+| GET    | /listar | Listagem paginada dos **produtos gerados** (`grade_produto_itens`) |
+| GET    | /listar/{id} | Detalhe de um produto gerado (id do item) |
+| GET    | /produto/{id} | Alias de `/listar/{id}` — detalhe do produto gerado |
+| GET    | /listar-grade/{id} | Detalhe da grade (cadastro/edição): combinações e produtos |
 | POST   | /cadastrar | Cria grade + combinações (+ gera produtos se `gerar_produtos: true`) |
 | PUT    | /editar | Edita grade (+ regenera se `gerar_produtos: true`) |
 | DELETE | /excluir/{id} | Exclui grade, combinações e produtos gerados |
@@ -106,6 +118,55 @@ Produtos finais gerados pela grade.
 | GET    | /grade-produtos-list | Autocomplete async |
 
 > Prefixo: `/api/v1/grades-produtos/...` (alias legado: `/api/v1/grade-produtos/...`)
+
+---
+
+## Listagem — `GET /listar`
+
+Origem: **`grade_produto_itens`** — uma linha por produto final gerado (ex.: 112 produtos = 112 linhas).
+
+| Campo | Origem |
+|-------|--------|
+| sku | `grade_produto_itens.sku` |
+| nome_produto | `grade_produto_itens.nome_produto` |
+| codigo_base | `produtos_base.codigo_base` (via grade) |
+| partes | Partes da grade, ex.: `Cuba + Tampa` |
+| peso_total | `grade_produto_itens.peso_total` |
+| tempo_total | `grade_produto_itens.tempo_total` |
+| custo_filamento | `grade_produto_itens.custo_filamento` |
+| custo_energia | `grade_produto_itens.custo_energia` |
+| custo_desgaste | `grade_produto_itens.custo_desgaste` |
+| custo_total | `grade_produto_itens.custo_total` |
+| status | `grade_produto_itens.status` |
+
+**Filtros:** `sku`, `nome_produto`, `codigo_base`, `parte` (ou `partes`), `status`, `id_grade_produto`, `id_produto_base`, `palavra_chave`.
+
+Exemplo:
+
+| sku | nome_produto |
+|-----|----------------|
+| 1000-prtjs-rsa | Porta Joias Rosa |
+| 1000-prtjs-azl | Porta Joias Azul |
+
+---
+
+## Visualização do produto — `GET /listar/{id}`
+
+`{id}` = id do registro em `grade_produto_itens`.
+
+Retorna os campos do produto gerado (SKU, nome, custos, partes da grade, etc.).
+
+---
+
+## Alias — `GET /produto/{id}`
+
+Mesmo comportamento de `/listar/{id}` — `{id}` = id do registro em `grade_produto_itens`.
+
+---
+
+## Visualização da grade — `GET /listar-grade/{id}`
+
+`{id}` = id em `grades_produtos`. Usado no fluxo de cadastro/edição da grade (combinações, produtos gerados da grade).
 
 ---
 

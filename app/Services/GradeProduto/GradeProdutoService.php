@@ -7,6 +7,7 @@ use App\Repositories\GradeProduto\GradeProdutoRepository;
 use App\Repositories\GradeProdutoCombinacao\GradeProdutoCombinacaoRepository;
 use App\Repositories\GradeProdutoCombinacaoParte\GradeProdutoCombinacaoParteRepository;
 use App\Repositories\GradeProdutoItem\GradeProdutoItemRepository;
+use App\Repositories\GradeProdutoParte\GradeProdutoParteRepository;
 use App\Repositories\ProdutoComposicao\ProdutoComposicaoRepository;
 use App\Repositories\ProdutoVariacao\ProdutoVariacaoRepository;
 use App\Services\PaginateService;
@@ -25,6 +26,8 @@ class GradeProdutoService
 
     private GradeProdutoItemRepository $_itemRepository;
 
+    private GradeProdutoParteRepository $_parteRepository;
+
     private ProdutoComposicaoRepository $_composicaoRepository;
 
     private ProdutoVariacaoRepository $_variacaoRepository;
@@ -41,6 +44,7 @@ class GradeProdutoService
         $this->_combinacaoRepository       = new GradeProdutoCombinacaoRepository();
         $this->_combinacaoParteRepository  = new GradeProdutoCombinacaoParteRepository();
         $this->_itemRepository             = new GradeProdutoItemRepository();
+        $this->_parteRepository            = new GradeProdutoParteRepository();
         $this->_composicaoRepository       = new ProdutoComposicaoRepository();
         $this->_variacaoRepository         = new ProdutoVariacaoRepository();
         $this->_geracaoService             = new GradeProdutoGeracaoService();
@@ -229,7 +233,7 @@ class GradeProdutoService
             DB::commit();
 
             return (object) [
-                'data'    => $this->getGradeProdutoId($grade->id),
+                'data'    => $this->getGradeProdutoGradeId($grade->id),
                 'status'  => true,
                 'message' => 'Grade gerada e produtos finais salvos com sucesso!',
             ];
@@ -262,7 +266,7 @@ class GradeProdutoService
         }
 
         return (object) [
-            'data'    => $this->getGradeProdutoId($grade->id),
+            'data'    => $this->getGradeProdutoGradeId($grade->id),
             'status'  => true,
             'message' => 'Grade de produtos cadastrada com sucesso!',
         ];
@@ -314,7 +318,7 @@ class GradeProdutoService
         }
 
         return (object) [
-            'data'    => $this->getGradeProdutoId($record->id),
+            'data'    => $this->getGradeProdutoGradeId($record->id),
             'status'  => true,
             'message' => 'Grade de produtos alterada com sucesso!',
         ];
@@ -330,6 +334,7 @@ class GradeProdutoService
 
         $this->_itemRepository->deleteByGradeId((int) $record->id);
         $this->removerCombinacoesGrade((int) $record->id);
+        $this->_parteRepository->deleteByGradeId((int) $record->id);
 
         $saved = $this->_repository->delete($record);
 
@@ -346,8 +351,8 @@ class GradeProdutoService
 
     public function getGradeProdutoPaginate(object $atributes): array
     {
-        $query = $this->_repository->getPaginateQuery();
-        $this->applyFiltros($query, $atributes);
+        $query = $this->_itemRepository->getPaginateQuery();
+        $this->applyFiltrosProdutos($query, $atributes);
 
         $paginate  = new PaginateService();
         $resultado = $paginate->_paginate(
@@ -358,10 +363,27 @@ class GradeProdutoService
         );
         $resultado->appends((array) $atributes);
 
-        return collect($resultado)->toArray();
+        $payload = collect($resultado)->toArray();
+        $payload['data'] = array_map(
+            fn ($row) => $this->formatarListagemProduto((array) $row),
+            $payload['data'] ?? []
+        );
+
+        return $payload;
     }
 
     public function getGradeProdutoId(int|string $id): array
+    {
+        $record = $this->_itemRepository->findByIdWithRelations($id);
+
+        if (!$record) {
+            throw new Exception('Produto gerado não encontrado', 404);
+        }
+
+        return $this->formatarDetalheProduto((array) $record);
+    }
+
+    public function getGradeProdutoGradeId(int|string $id): array
     {
         $record = $this->_repository->findByIdWithRelations($id);
 
@@ -369,28 +391,35 @@ class GradeProdutoService
             throw new Exception('Grade de produtos não encontrada', 404);
         }
 
-        $composicao = $this->_composicaoRepository->findAtivaByProdutoId((int) $record->id_produto_base);
+        return $this->montarDetalheGrade($record);
+    }
 
-        $composicaoCompleta = $composicao
-            ? $this->montarComposicaoCompleta((int) $composicao->id)
-            : null;
+    private function montarDetalheGrade(object $record): array
+    {
+        $idGrade = (int) $record->id;
+        $this->sincronizarPartesGradeSeVazio($idGrade);
+
+        $partes      = $this->_parteRepository->getByGradeId($idGrade);
+        $combinacoes = $this->montarCombinacoesResponse($idGrade);
 
         return [
-            'id'              => (int) $record->id,
-            'id_produto_base' => (int) $record->id_produto_base,
-            'descricao'       => $record->descricao,
-            'status'          => (bool) $record->status,
-            'created_at'      => $record->created_at,
-            'updated_at'      => $record->updated_at,
-            'produto'         => [
-                'descricao_produto' => $record->descricao_produto,
-                'sku_base'          => $record->sku_base,
-                'codigo_base'       => $record->codigo_base,
-            ],
-            'combinacoes'      => $this->montarCombinacoesResponse((int) $record->id),
-            'composicao'       => $composicaoCompleta,
-            'produtos_gerados' => $this->_itemRepository->getByGradeId((int) $record->id)->toArray(),
-            'quantidade_produtos' => $this->_itemRepository->countByGradeId((int) $record->id),
+            'id'                      => $idGrade,
+            'id_produto_base'         => (int) $record->id_produto_base,
+            'codigo_base'             => $record->codigo_base,
+            'nome_parte'              => $this->montarNomePartesLabel($partes),
+            'descricao_grade'         => $record->descricao,
+            'status'                  => (bool) $record->status,
+            'created_at'              => $record->created_at,
+            'updated_at'              => $record->updated_at,
+            'partes'                  => $partes->map(fn ($parte) => [
+                'id'               => (int) $parte->id,
+                'id_parte_projeto' => (int) $parte->id_parte_projeto,
+                'nome_parte'       => $parte->nome_parte,
+            ])->values()->toArray(),
+            'combinacoes'             => $combinacoes,
+            'produtos_gerados'        => $this->_itemRepository->getByGradeId($idGrade)->toArray(),
+            'quantidade_combinacoes'  => count($combinacoes),
+            'quantidade_produtos'     => $this->_itemRepository->countByGradeId($idGrade),
         ];
     }
 
@@ -422,19 +451,22 @@ class GradeProdutoService
 
     public function getGradeProdutoAsync(object $params): array
     {
-        $query = $this->_repository->getAsyncQuery();
+        $query = $this->_itemRepository->getAsyncQuery();
 
         if (!empty($params->palavra_chave)) {
             $chave = $params->palavra_chave;
             $query->where(function ($q) use ($chave) {
-                $q->where('gp.descricao', 'like', '%' . $chave . '%')
-                    ->orWhere('pb.descricao_produto', 'like', '%' . $chave . '%')
-                    ->orWhere('pb.sku_base', 'like', '%' . $chave . '%');
+                $q->where('gpi.nome_produto', 'like', '%' . $chave . '%')
+                    ->orWhere('gpi.sku', 'like', '%' . $chave . '%')
+                    ->orWhere('pb.codigo_base', 'like', '%' . $chave . '%');
             });
             $query->limit(10);
         }
 
-        return $query->get()->toArray();
+        return array_map(
+            fn ($row) => $this->formatarAsyncProduto((array) $row),
+            $query->get()->toArray()
+        );
     }
 
     private function montarCombinacoesResponse(int $idGrade): array
@@ -763,7 +795,40 @@ class GradeProdutoService
             }
         }
 
+        $this->salvarPartesGrade($idGrade, array_values(array_unique($idsPartesTodas)));
+
         return $combinacoes;
+    }
+
+    private function salvarPartesGrade(int $idGrade, array $idsPartes): void
+    {
+        $this->_parteRepository->deleteByGradeId($idGrade);
+
+        foreach ($idsPartes as $idParte) {
+            if ($idParte <= 0) {
+                continue;
+            }
+
+            $this->_parteRepository->create([
+                'id_grade_produto' => $idGrade,
+                'id_parte_projeto' => (int) $idParte,
+            ]);
+        }
+    }
+
+    private function sincronizarPartesGradeSeVazio(int $idGrade): void
+    {
+        if (!empty($this->_parteRepository->getIdsPartesByGradeId($idGrade))) {
+            return;
+        }
+
+        $idsPartes = $this->_combinacaoParteRepository->getDistinctParteIdsByGradeId($idGrade);
+
+        if (empty($idsPartes)) {
+            return;
+        }
+
+        $this->salvarPartesGrade($idGrade, $idsPartes);
     }
 
     private function removerCombinacoesGrade(int $idGrade): void
@@ -773,6 +838,7 @@ class GradeProdutoService
 
         $this->_combinacaoParteRepository->deleteByCombinacaoIds($ids);
         $this->_combinacaoRepository->deleteByGradeId($idGrade);
+        $this->_parteRepository->deleteByGradeId($idGrade);
     }
 
     /**
@@ -908,28 +974,140 @@ class GradeProdutoService
         }, $produtos);
     }
 
-    private function applyFiltros($query, object $atributes): void
+    private function applyFiltrosProdutos($query, object $atributes): void
     {
         if (!empty($atributes->id_produto_base)) {
             $query->where('gp.id_produto_base', $atributes->id_produto_base);
         }
 
-        if (!empty($atributes->descricao)) {
-            $chave = $atributes->descricao;
-            $query->where('gp.descricao', 'like', '%' . $chave . '%');
+        if (!empty($atributes->id_grade_produto)) {
+            $query->where('gpi.id_grade_produto', $atributes->id_grade_produto);
+        }
+
+        if (!empty($atributes->codigo_base)) {
+            $query->where('pb.codigo_base', 'like', '%' . $atributes->codigo_base . '%');
+        }
+
+        if (!empty($atributes->sku)) {
+            $query->where('gpi.sku', 'like', '%' . $atributes->sku . '%');
+        }
+
+        $nomeProduto = $atributes->nome_produto ?? $atributes->nome ?? null;
+
+        if (!empty($nomeProduto)) {
+            $query->where('gpi.nome_produto', 'like', '%' . $nomeProduto . '%');
+        }
+
+        if (!empty($atributes->parte) || !empty($atributes->partes)) {
+            $this->aplicarFiltroParte($query, (string) ($atributes->parte ?? $atributes->partes));
         }
 
         if (isset($atributes->status) && $atributes->status !== '') {
-            $query->where('gp.status', $this->normalizarStatus($atributes->status));
+            $query->where('gpi.status', $this->normalizarStatus($atributes->status));
         }
 
         if (!empty($atributes->palavra_chave)) {
             $chave = $atributes->palavra_chave;
             $query->where(function ($q) use ($chave) {
-                $q->where('gp.descricao', 'like', '%' . $chave . '%')
-                    ->orWhere('pb.descricao_produto', 'like', '%' . $chave . '%')
-                    ->orWhere('pb.sku_base', 'like', '%' . $chave . '%');
+                $q->where('gpi.nome_produto', 'like', '%' . $chave . '%')
+                    ->orWhere('gpi.sku', 'like', '%' . $chave . '%')
+                    ->orWhere('pb.codigo_base', 'like', '%' . $chave . '%');
             });
         }
+    }
+
+    private function aplicarFiltroParte($query, string $parte): void
+    {
+        $chave = '%' . $parte . '%';
+
+        $query->where(function ($q) use ($chave) {
+            $q->whereExists(function ($sub) use ($chave) {
+                $sub->select(DB::raw(1))
+                    ->from('grade_produto_partes as gpp_f')
+                    ->join('projetos_impressao_partes as parte_f', 'parte_f.id', '=', 'gpp_f.id_parte_projeto')
+                    ->whereColumn('gpp_f.id_grade_produto', 'gpi.id_grade_produto')
+                    ->whereNull('gpp_f.deleted_at')
+                    ->whereNull('parte_f.deleted_at')
+                    ->where('parte_f.nome_parte', 'like', $chave);
+            })->orWhereExists(function ($sub) use ($chave) {
+                $sub->select(DB::raw(1))
+                    ->from('grade_produto_combinacao_partes as gpcp_f')
+                    ->join('grade_produto_combinacoes as gpc_f', 'gpc_f.id', '=', 'gpcp_f.id_grade_produto_combinacao')
+                    ->join('projetos_impressao_partes as parte_f', 'parte_f.id', '=', 'gpcp_f.id_parte_projeto')
+                    ->whereColumn('gpc_f.id_grade_produto', 'gpi.id_grade_produto')
+                    ->whereNull('gpcp_f.deleted_at')
+                    ->whereNull('gpc_f.deleted_at')
+                    ->whereNull('parte_f.deleted_at')
+                    ->where('parte_f.nome_parte', 'like', $chave);
+            });
+        });
+    }
+
+    private function formatarListagemProduto(array $row): array
+    {
+        return [
+            'id'              => (int) ($row['id'] ?? 0),
+            'sku'             => $row['sku'] ?? '',
+            'nome_produto'    => $row['nome_produto'] ?? '',
+            'codigo_base'     => $row['codigo_base'] ?? null,
+            'partes'          => $row['partes'] ?? '',
+            'peso_total'      => (float) ($row['peso_total'] ?? 0),
+            'tempo_total'     => $row['tempo_total'] ?? '00:00',
+            'custo_filamento' => (float) ($row['custo_filamento'] ?? 0),
+            'custo_energia'   => (float) ($row['custo_energia'] ?? 0),
+            'custo_desgaste'  => (float) ($row['custo_desgaste'] ?? 0),
+            'custo_total'     => (float) ($row['custo_total'] ?? 0),
+            'status'          => (bool) ($row['status'] ?? true),
+            'id_grade_produto' => (int) ($row['id_grade_produto'] ?? 0),
+        ];
+    }
+
+    private function formatarDetalheProduto(array $row): array
+    {
+        return [
+            'id'               => (int) ($row['id'] ?? 0),
+            'sku'              => $row['sku'] ?? '',
+            'nome_produto'     => $row['nome_produto'] ?? '',
+            'codigo_base'      => $row['codigo_base'] ?? null,
+            'partes'           => $row['partes'] ?? '',
+            'peso_total'       => (float) ($row['peso_total'] ?? 0),
+            'tempo_total'      => $row['tempo_total'] ?? '00:00',
+            'custo_filamento'  => (float) ($row['custo_filamento'] ?? 0),
+            'custo_energia'    => (float) ($row['custo_energia'] ?? 0),
+            'custo_desgaste'   => (float) ($row['custo_desgaste'] ?? 0),
+            'custo_total'      => (float) ($row['custo_total'] ?? 0),
+            'status'           => (bool) ($row['status'] ?? true),
+            'id_grade_produto' => (int) ($row['id_grade_produto'] ?? 0),
+            'id_produto_base'  => (int) ($row['id_produto_base'] ?? 0),
+            'descricao_grade'  => $row['descricao_grade'] ?? null,
+            'created_at'       => $row['created_at'] ?? null,
+            'updated_at'       => $row['updated_at'] ?? null,
+        ];
+    }
+
+    private function formatarAsyncProduto(array $row): array
+    {
+        $nome = (string) ($row['nome_produto'] ?? '');
+        $sku  = (string) ($row['sku'] ?? '');
+        $rotulo = trim($nome . ($sku !== '' ? ' (' . $sku . ')' : ''));
+
+        return [
+            'id'           => (int) ($row['id'] ?? 0),
+            'descricao'    => $rotulo !== '' ? $rotulo : $sku,
+            'sku'          => $sku,
+            'nome_produto' => $nome,
+            'codigo_base'  => $row['codigo_base'] ?? null,
+        ];
+    }
+
+    private function montarNomePartesLabel($partes): string
+    {
+        return $partes
+            ->pluck('nome_parte')
+            ->filter()
+            ->unique()
+            ->sort()
+            ->values()
+            ->implode(' + ');
     }
 }

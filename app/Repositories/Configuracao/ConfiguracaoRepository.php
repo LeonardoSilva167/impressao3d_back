@@ -6,6 +6,22 @@ use App\Models\Configuracao;
 
 class ConfiguracaoRepository
 {
+    public function findById(int|string|null $id): ?Configuracao
+    {
+        if ($id === null || $id === '') {
+            return null;
+        }
+
+        return Configuracao::whereNull('deleted_at')
+            ->where('id', $id)
+            ->first();
+    }
+
+    public function update(Configuracao $configuracao, array $dados): bool
+    {
+        return (bool) $configuracao->update($dados);
+    }
+
     public function consumirProximoCodigoBase(): string
     {
         $configuracao = Configuracao::whereNull('deleted_at')

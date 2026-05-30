@@ -21,6 +21,14 @@ class GradeProdutoCombinacaoRepository
             ->each(fn (GradeProdutoCombinacao $combinacao) => $combinacao->delete());
     }
 
+    public function countByGradeId(int $idGrade): int
+    {
+        return (int) DB::table('grade_produto_combinacoes')
+            ->where('id_grade_produto', $idGrade)
+            ->whereNull('deleted_at')
+            ->count();
+    }
+
     public function getByGradeId(int $idGrade): Collection
     {
         return DB::table('grade_produto_combinacoes as gpc')

@@ -60,6 +60,18 @@ class GradeProdutoController extends Controller
         }
     }
 
+    public function listarGradeProdutoGradeId(string $id)
+    {
+        try {
+            $result = $this->_service->getGradeProdutoGradeId($id);
+            return response()->json($result, 200);
+        } catch (Exception $ex) {
+            $statusCode = is_numeric($ex->getCode()) ? (int) $ex->getCode() : 500;
+            $statusCode = ($statusCode >= 100 && $statusCode <= 599) ? $statusCode : 500;
+            return response()->json(['error' => true, 'message' => $ex->getMessage()], $statusCode);
+        }
+    }
+
     public function carregarComposicaoGradeProduto(Request $request)
     {
         try {
