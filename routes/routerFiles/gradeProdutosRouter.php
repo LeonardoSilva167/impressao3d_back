@@ -1,12 +1,18 @@
 <?php
 
-use App\Http\Controllers\ProdutoGradesController;
+use App\Http\Controllers\GradeProdutoController;
 use Illuminate\Support\Facades\Route;
 
-Route::get('/lookups', [ProdutoGradesController::class, 'listarLookupsProdutoGrades']);
-Route::get('/listar', [ProdutoGradesController::class, 'listarProdutoGrades']);
-Route::get('/listar/{id}', [ProdutoGradesController::class, 'listarGradeId']);
-Route::post('/cadastrar', [ProdutoGradesController::class, 'createProdutoGrades']);
-Route::put('/editar', [ProdutoGradesController::class, 'editProdutoGrades']);
-Route::delete('/excluir/{id}', [ProdutoGradesController::class, 'deleteProdutoGrades']);
-Route::get('/produto-grades-list', [ProdutoGradesController::class, 'listarProdutoGradesAsync']);
+Route::get('/lookups',              [GradeProdutoController::class, 'listarLookupsGradeProduto']);
+Route::get('/carregar-dados',       [GradeProdutoController::class, 'carregarComposicaoGradeProduto']);
+Route::get('/carregar-composicao',  [GradeProdutoController::class, 'carregarComposicaoGradeProduto']);
+Route::get('/listar',               [GradeProdutoController::class, 'listarGradeProduto']);
+Route::get('/listar/{id}',          [GradeProdutoController::class, 'listarGradeProdutoId']);
+Route::post('/cadastrar',           [GradeProdutoController::class, 'createGradeProduto']);
+Route::put('/editar',               [GradeProdutoController::class, 'editGradeProduto']);
+Route::delete('/excluir/{id}',      [GradeProdutoController::class, 'deleteGradeProduto']);
+Route::post('/preview-produtos',    [GradeProdutoController::class, 'previewProdutosGradeProduto']);
+Route::post('/gerar-grade',         [GradeProdutoController::class, 'gerarGradeProduto']);
+Route::post('/gerar-produtos/{id}', [GradeProdutoController::class, 'gerarProdutosGradeProduto']);
+Route::get('/grades-produtos-list', [GradeProdutoController::class, 'listarGradeProdutoAsync']);
+Route::get('/grade-produtos-list',  [GradeProdutoController::class, 'listarGradeProdutoAsync']);
