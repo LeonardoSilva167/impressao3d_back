@@ -14,6 +14,7 @@ class GradeProdutoItem extends Model
 
     protected $fillable = [
         'id_grade_produto',
+        'id_grade_produto_combinacao',
         'nome_produto',
         'sku',
         'peso_total',
@@ -26,8 +27,9 @@ class GradeProdutoItem extends Model
     ];
 
     protected $casts = [
-        'id'               => 'integer',
-        'id_grade_produto' => 'integer',
+        'id'                            => 'integer',
+        'id_grade_produto'              => 'integer',
+        'id_grade_produto_combinacao'   => 'integer',
         'peso_total'       => 'float',
         'custo_filamento'  => 'float',
         'custo_energia'    => 'float',

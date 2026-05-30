@@ -129,6 +129,7 @@ Origem: **`grade_produto_itens`** — uma linha por produto final gerado (ex.: 1
 |-------|--------|
 | sku | `grade_produto_itens.sku` |
 | nome_produto | `grade_produto_itens.nome_produto` |
+| descricao_combinacao | `grade_produto_combinacoes.descricao` (combinação que gerou o produto) |
 | codigo_base | `produtos_base.codigo_base` (via grade) |
 | partes | Partes da grade, ex.: `Cuba + Tampa` |
 | peso_total | `grade_produto_itens.peso_total` |

@@ -35,6 +35,7 @@ class GradeProdutoItemRepository
             ->select(
                 'gpi.id',
                 'gpi.id_grade_produto',
+                'gpi.id_grade_produto_combinacao',
                 'gpi.sku',
                 'gpi.nome_produto',
                 'gpi.peso_total',
@@ -46,11 +47,16 @@ class GradeProdutoItemRepository
                 'gpi.status',
                 'gpi.created_at',
                 'pb.codigo_base',
+                'gpc.descricao as descricao_combinacao',
                 DB::raw("({$nomePartesSql}) as partes"),
             )
             ->from('grade_produto_itens as gpi')
             ->join('grades_produtos as gp', 'gp.id', '=', 'gpi.id_grade_produto')
             ->join('produtos_base as pb', 'pb.id', '=', 'gp.id_produto_base')
+            ->leftJoin('grade_produto_combinacoes as gpc', function ($join) {
+                $join->on('gpc.id', '=', 'gpi.id_grade_produto_combinacao')
+                    ->whereNull('gpc.deleted_at');
+            })
             ->whereNull('gpi.deleted_at')
             ->whereNull('gp.deleted_at')
             ->whereNull('pb.deleted_at')
@@ -65,6 +71,7 @@ class GradeProdutoItemRepository
             ->select(
                 'gpi.id',
                 'gpi.id_grade_produto',
+                'gpi.id_grade_produto_combinacao',
                 'gpi.sku',
                 'gpi.nome_produto',
                 'gpi.peso_total',
@@ -79,10 +86,15 @@ class GradeProdutoItemRepository
                 'pb.codigo_base',
                 'pb.id as id_produto_base',
                 'gp.descricao as descricao_grade',
+                'gpc.descricao as descricao_combinacao',
                 DB::raw("({$nomePartesSql}) as partes"),
             )
             ->join('grades_produtos as gp', 'gp.id', '=', 'gpi.id_grade_produto')
             ->join('produtos_base as pb', 'pb.id', '=', 'gp.id_produto_base')
+            ->leftJoin('grade_produto_combinacoes as gpc', function ($join) {
+                $join->on('gpc.id', '=', 'gpi.id_grade_produto_combinacao')
+                    ->whereNull('gpc.deleted_at');
+            })
             ->whereNull('gpi.deleted_at')
             ->whereNull('gp.deleted_at')
             ->whereNull('pb.deleted_at')
@@ -113,6 +125,7 @@ class GradeProdutoItemRepository
             ->select(
                 'gpi.id',
                 'gpi.id_grade_produto',
+                'gpi.id_grade_produto_combinacao',
                 'gpi.nome_produto',
                 'gpi.sku',
                 'gpi.peso_total',
@@ -123,7 +136,12 @@ class GradeProdutoItemRepository
                 'gpi.custo_total',
                 'gpi.status',
                 'gpi.created_at',
+                'gpc.descricao as descricao_combinacao',
             )
+            ->leftJoin('grade_produto_combinacoes as gpc', function ($join) {
+                $join->on('gpc.id', '=', 'gpi.id_grade_produto_combinacao')
+                    ->whereNull('gpc.deleted_at');
+            })
             ->where('gpi.id_grade_produto', $idGrade)
             ->whereNull('gpi.deleted_at')
             ->orderBy('gpi.nome_produto')

@@ -497,6 +497,7 @@ class GradeProdutoService
             $partes = $this->_combinacaoParteRepository->getByCombinacaoId((int) $combinacao->id);
 
             $combinacoes[] = [
+                'id'        => (int) $combinacao->id,
                 'descricao' => $combinacao->descricao,
                 'partes'    => $partes->map(fn ($parte) => [
                     'id_parte_projeto' => (int) $parte->id_parte_projeto,
@@ -635,6 +636,14 @@ class GradeProdutoService
                 $contexto['itens_projeto_por_id'],
             );
 
+            $idCombinacao = isset($combinacao['id']) ? (int) $combinacao['id'] : null;
+            $descricaoCombinacao = (string) ($combinacao['descricao'] ?? '');
+
+            foreach ($produtosCombinacao as $index => $produtoGerado) {
+                $produtosCombinacao[$index]['id_grade_produto_combinacao'] = $idCombinacao;
+                $produtosCombinacao[$index]['descricao_combinacao']        = $descricaoCombinacao;
+            }
+
             $todosProdutos = array_merge($todosProdutos, $produtosCombinacao);
         }
 
@@ -768,6 +777,8 @@ class GradeProdutoService
 
         $idsPartesTodas = [];
 
+        $salvas = [];
+
         foreach ($combinacoes as $combinacao) {
             foreach ($combinacao['partes'] as $parte) {
                 $idsPartesTodas[] = (int) $parte['id_parte_projeto'];
@@ -793,11 +804,17 @@ class GradeProdutoService
                     'quantidade'                  => (int) $parte['quantidade'],
                 ]);
             }
+
+            $salvas[] = [
+                'id'        => (int) $registro->id,
+                'descricao' => $combinacao['descricao'],
+                'partes'    => $combinacao['partes'],
+            ];
         }
 
         $this->salvarPartesGrade($idGrade, array_values(array_unique($idsPartesTodas)));
 
-        return $combinacoes;
+        return $salvas;
     }
 
     private function salvarPartesGrade(int $idGrade, array $idsPartes): void
@@ -951,8 +968,9 @@ class GradeProdutoService
 
         foreach ($produtos as $produto) {
             $this->_itemRepository->create([
-                'id_grade_produto' => $idGrade,
-                'nome_produto'     => $produto['nome_produto'],
+                'id_grade_produto'              => $idGrade,
+                'id_grade_produto_combinacao'   => $produto['id_grade_produto_combinacao'] ?? null,
+                'nome_produto'                  => $produto['nome_produto'],
                 'sku'              => $produto['sku'],
                 'peso_total'       => $produto['peso_total'],
                 'tempo_total'      => $produto['tempo_total'],
@@ -995,7 +1013,7 @@ class GradeProdutoService
         $nomeProduto = $atributes->nome_produto ?? $atributes->nome ?? null;
 
         if (!empty($nomeProduto)) {
-            $query->where('gpi.nome_produto', 'like', '%' . $nomeProduto . '%');
+            $this->aplicarFiltroBuscaTexto($query, (string) $nomeProduto);
         }
 
         if (!empty($atributes->parte) || !empty($atributes->partes)) {
@@ -1007,13 +1025,48 @@ class GradeProdutoService
         }
 
         if (!empty($atributes->palavra_chave)) {
-            $chave = $atributes->palavra_chave;
-            $query->where(function ($q) use ($chave) {
-                $q->where('gpi.nome_produto', 'like', '%' . $chave . '%')
-                    ->orWhere('gpi.sku', 'like', '%' . $chave . '%')
-                    ->orWhere('pb.codigo_base', 'like', '%' . $chave . '%');
-            });
+            $this->aplicarFiltroBuscaTexto($query, (string) $atributes->palavra_chave, true);
         }
+    }
+
+    private function aplicarFiltroBuscaTexto($query, string $termo, bool $incluirSkuCodigo = false): void
+    {
+        $like = '%' . $termo . '%';
+
+        $query->where(function ($q) use ($like, $incluirSkuCodigo) {
+            $q->where('gpi.nome_produto', 'like', $like);
+
+            if ($incluirSkuCodigo) {
+                $q->orWhere('gpi.sku', 'like', $like)
+                    ->orWhere('pb.codigo_base', 'like', $like);
+            }
+
+            $q->orWhereExists(function ($sub) use ($like) {
+                $sub->select(DB::raw(1))
+                    ->from('grade_produto_combinacoes as gpc_b')
+                    ->whereColumn('gpc_b.id_grade_produto', 'gpi.id_grade_produto')
+                    ->whereNull('gpc_b.deleted_at')
+                    ->where('gpc_b.descricao', 'like', $like);
+            })->orWhereExists(function ($sub) use ($like) {
+                $sub->select(DB::raw(1))
+                    ->from('grade_produto_partes as gpp_b')
+                    ->join('projetos_impressao_partes as parte_b', 'parte_b.id', '=', 'gpp_b.id_parte_projeto')
+                    ->whereColumn('gpp_b.id_grade_produto', 'gpi.id_grade_produto')
+                    ->whereNull('gpp_b.deleted_at')
+                    ->whereNull('parte_b.deleted_at')
+                    ->where('parte_b.nome_parte', 'like', $like);
+            })->orWhereExists(function ($sub) use ($like) {
+                $sub->select(DB::raw(1))
+                    ->from('grade_produto_combinacao_partes as gpcp_b')
+                    ->join('grade_produto_combinacoes as gpc_b', 'gpc_b.id', '=', 'gpcp_b.id_grade_produto_combinacao')
+                    ->join('projetos_impressao_partes as parte_b', 'parte_b.id', '=', 'gpcp_b.id_parte_projeto')
+                    ->whereColumn('gpc_b.id_grade_produto', 'gpi.id_grade_produto')
+                    ->whereNull('gpcp_b.deleted_at')
+                    ->whereNull('gpc_b.deleted_at')
+                    ->whereNull('parte_b.deleted_at')
+                    ->where('parte_b.nome_parte', 'like', $like);
+            });
+        });
     }
 
     private function aplicarFiltroParte($query, string $parte): void
@@ -1046,42 +1099,50 @@ class GradeProdutoService
     private function formatarListagemProduto(array $row): array
     {
         return [
-            'id'              => (int) ($row['id'] ?? 0),
-            'sku'             => $row['sku'] ?? '',
-            'nome_produto'    => $row['nome_produto'] ?? '',
-            'codigo_base'     => $row['codigo_base'] ?? null,
-            'partes'          => $row['partes'] ?? '',
-            'peso_total'      => (float) ($row['peso_total'] ?? 0),
-            'tempo_total'     => $row['tempo_total'] ?? '00:00',
-            'custo_filamento' => (float) ($row['custo_filamento'] ?? 0),
-            'custo_energia'   => (float) ($row['custo_energia'] ?? 0),
-            'custo_desgaste'  => (float) ($row['custo_desgaste'] ?? 0),
-            'custo_total'     => (float) ($row['custo_total'] ?? 0),
-            'status'          => (bool) ($row['status'] ?? true),
-            'id_grade_produto' => (int) ($row['id_grade_produto'] ?? 0),
+            'id'                            => (int) ($row['id'] ?? 0),
+            'sku'                           => $row['sku'] ?? '',
+            'nome_produto'                  => $row['nome_produto'] ?? '',
+            'codigo_base'                   => $row['codigo_base'] ?? null,
+            'partes'                        => $row['partes'] ?? '',
+            'descricao_combinacao'          => $row['descricao_combinacao'] ?? null,
+            'id_grade_produto_combinacao'   => !empty($row['id_grade_produto_combinacao'])
+                ? (int) $row['id_grade_produto_combinacao']
+                : null,
+            'peso_total'                    => (float) ($row['peso_total'] ?? 0),
+            'tempo_total'                   => $row['tempo_total'] ?? '00:00',
+            'custo_filamento'               => (float) ($row['custo_filamento'] ?? 0),
+            'custo_energia'                 => (float) ($row['custo_energia'] ?? 0),
+            'custo_desgaste'                => (float) ($row['custo_desgaste'] ?? 0),
+            'custo_total'                   => (float) ($row['custo_total'] ?? 0),
+            'status'                        => (bool) ($row['status'] ?? true),
+            'id_grade_produto'              => (int) ($row['id_grade_produto'] ?? 0),
         ];
     }
 
     private function formatarDetalheProduto(array $row): array
     {
         return [
-            'id'               => (int) ($row['id'] ?? 0),
-            'sku'              => $row['sku'] ?? '',
-            'nome_produto'     => $row['nome_produto'] ?? '',
-            'codigo_base'      => $row['codigo_base'] ?? null,
-            'partes'           => $row['partes'] ?? '',
-            'peso_total'       => (float) ($row['peso_total'] ?? 0),
-            'tempo_total'      => $row['tempo_total'] ?? '00:00',
-            'custo_filamento'  => (float) ($row['custo_filamento'] ?? 0),
-            'custo_energia'    => (float) ($row['custo_energia'] ?? 0),
-            'custo_desgaste'   => (float) ($row['custo_desgaste'] ?? 0),
-            'custo_total'      => (float) ($row['custo_total'] ?? 0),
-            'status'           => (bool) ($row['status'] ?? true),
-            'id_grade_produto' => (int) ($row['id_grade_produto'] ?? 0),
-            'id_produto_base'  => (int) ($row['id_produto_base'] ?? 0),
-            'descricao_grade'  => $row['descricao_grade'] ?? null,
-            'created_at'       => $row['created_at'] ?? null,
-            'updated_at'       => $row['updated_at'] ?? null,
+            'id'                            => (int) ($row['id'] ?? 0),
+            'sku'                           => $row['sku'] ?? '',
+            'nome_produto'                  => $row['nome_produto'] ?? '',
+            'codigo_base'                   => $row['codigo_base'] ?? null,
+            'partes'                        => $row['partes'] ?? '',
+            'descricao_combinacao'          => $row['descricao_combinacao'] ?? null,
+            'id_grade_produto_combinacao'   => !empty($row['id_grade_produto_combinacao'])
+                ? (int) $row['id_grade_produto_combinacao']
+                : null,
+            'peso_total'                    => (float) ($row['peso_total'] ?? 0),
+            'tempo_total'                   => $row['tempo_total'] ?? '00:00',
+            'custo_filamento'               => (float) ($row['custo_filamento'] ?? 0),
+            'custo_energia'                 => (float) ($row['custo_energia'] ?? 0),
+            'custo_desgaste'                => (float) ($row['custo_desgaste'] ?? 0),
+            'custo_total'                   => (float) ($row['custo_total'] ?? 0),
+            'status'                        => (bool) ($row['status'] ?? true),
+            'id_grade_produto'              => (int) ($row['id_grade_produto'] ?? 0),
+            'id_produto_base'               => (int) ($row['id_produto_base'] ?? 0),
+            'descricao_grade'               => $row['descricao_grade'] ?? null,
+            'created_at'                    => $row['created_at'] ?? null,
+            'updated_at'                    => $row['updated_at'] ?? null,
         ];
     }
 
