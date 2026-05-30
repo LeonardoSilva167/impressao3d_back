@@ -23,11 +23,12 @@ class ProdutoComposicaoCorRepository
 
     public function deleteByParteId(int $idComposicao, int $idParte): void
     {
-        ProdutoComposicaoCor::where('id_composicao', $idComposicao)
+        // Remove fisicamente: índice único não considera soft delete e impede reinsert.
+        ProdutoComposicaoCor::withTrashed()
+            ->where('id_composicao', $idComposicao)
             ->where('id_parte', $idParte)
-            ->whereNull('deleted_at')
             ->get()
-            ->each(fn (ProdutoComposicaoCor $cor) => $cor->delete());
+            ->each(fn (ProdutoComposicaoCor $cor) => $cor->forceDelete());
     }
 
     public function deleteByItemProjetoIds(int $idComposicao, array $idsItemProjeto): void

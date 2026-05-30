@@ -28,11 +28,11 @@ class ProdutoVariacaoRepository
 
     public function deleteByParteId(int $idComposicao, int $idParte): void
     {
-        ProdutoVariacao::where('id_composicao', $idComposicao)
+        ProdutoVariacao::withTrashed()
+            ->where('id_composicao', $idComposicao)
             ->where('id_parte', $idParte)
-            ->whereNull('deleted_at')
             ->get()
-            ->each(fn (ProdutoVariacao $variacao) => $variacao->delete());
+            ->each(fn (ProdutoVariacao $variacao) => $variacao->forceDelete());
     }
 
     public function softDeleteByProdutoId(int $idProduto): void

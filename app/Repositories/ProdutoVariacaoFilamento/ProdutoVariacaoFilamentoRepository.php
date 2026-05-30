@@ -41,11 +41,17 @@ class ProdutoVariacaoFilamentoRepository
         $idsVariacao = DB::table('produto_variacoes')
             ->where('id_composicao', $idComposicao)
             ->where('id_parte', $idParte)
-            ->whereNull('deleted_at')
             ->pluck('id')
             ->map(fn ($id) => (int) $id)
             ->toArray();
 
-        $this->deleteByVariacaoIds($idsVariacao);
+        if (empty($idsVariacao)) {
+            return;
+        }
+
+        ProdutoVariacaoFilamento::withTrashed()
+            ->whereIn('id_variacao', $idsVariacao)
+            ->get()
+            ->each(fn (ProdutoVariacaoFilamento $filamento) => $filamento->forceDelete());
     }
 }
