@@ -2,61 +2,28 @@
 
 namespace App\Services\ProjetoImpressao;
 
-use App\Models\Cor;
-use App\Models\ProjetoImpressao;
 use App\Repositories\ProjetoImpressao\ProjetoImpressaoRepository;
 use App\Services\PaginateService;
-use App\Services\ProjetoImpressaoCor\ProjetoImpressaoCorService;
-use App\Services\ProjetoImpressaoParte\ProjetoImpressaoParteConfig;
 use App\Services\ProjetoImpressaoParte\ProjetoImpressaoParteService;
 use Exception;
 use Illuminate\Support\Facades\DB;
 
 class ProjetoImpressaoService
 {
-    /**
-     * @var ProjetoImpressaoRepository $_repository
-     */
     private ProjetoImpressaoRepository $_repository;
 
-    /**
-     * @var ProjetoImpressaoCorService $_corService
-     */
-    private ProjetoImpressaoCorService $_corService;
-
-    /**
-     * @var ProjetoImpressaoParteService $_parteService
-     */
     private ProjetoImpressaoParteService $_parteService;
-
-    /**
-     * @var ProjetoImpressaoTempoService $_tempoService
-     */
-    private ProjetoImpressaoTempoService $_tempoService;
 
     public function __construct()
     {
         $this->_repository   = new ProjetoImpressaoRepository();
-        $this->_corService   = new ProjetoImpressaoCorService();
         $this->_parteService = new ProjetoImpressaoParteService();
-        $this->_tempoService = new ProjetoImpressaoTempoService();
     }
-
-    // =========================================================
-    // LOOKUPS
-    // =========================================================
 
     public function handleLookupsProjetoImpressao(): array
     {
-        return [
-            'cores'       => Cor::whereNull('deleted_at')->orderBy('descricao')->get(['id', 'descricao', 'codigo', 'hexadecimal']),
-            'bicosPadrao' => ProjetoImpressaoParteConfig::BICOS_PADRAO,
-        ];
+        return [];
     }
-
-    // =========================================================
-    // HANDLE FUNCTIONS (orquestração + transação)
-    // =========================================================
 
     public function handleAddProjetoImpressao(object $atributes): object
     {
@@ -67,6 +34,7 @@ class ProjetoImpressaoService
             $result->projetoImpressao = $this->createProjetoImpressao($atributes);
 
             DB::commit();
+
             return $result;
         } catch (Exception $e) {
             DB::rollback();
@@ -83,6 +51,7 @@ class ProjetoImpressaoService
             $result->projetoImpressao = $this->updateProjetoImpressao($atributes);
 
             DB::commit();
+
             return $result;
         } catch (Exception $e) {
             DB::rollback();
@@ -99,6 +68,7 @@ class ProjetoImpressaoService
             $result->projetoImpressao = $this->deleteProjetoImpressao($id);
 
             DB::commit();
+
             return $result;
         } catch (Exception $e) {
             DB::rollback();
@@ -106,31 +76,16 @@ class ProjetoImpressaoService
         }
     }
 
-    // =========================================================
-    // CRUD FUNCTIONS
-    // =========================================================
-
     public function createProjetoImpressao(object $atributes): object
     {
         $this->validateCodigoProjetoUnico($atributes->codigo_projeto);
-
-        $tempoTotalHoras = $this->_tempoService->converterParaHorasMinutos($atributes->tempo_total_horas);
-        $pesoTotalGramas = $this->_tempoService->normalizarValorNumerico($atributes->peso_total_gramas, 'O peso total do projeto');
-        $cores            = $atributes->cores ?? [];
-
-        $this->_corService->validarSomaPesos($cores, $pesoTotalGramas);
 
         $newData = $this->_repository->create([
             'url_projeto'           => $atributes->url_projeto,
             'nome_original_projeto' => $atributes->nome_original_projeto,
             'codigo_projeto'        => $atributes->codigo_projeto,
             'descricao_projeto'     => $atributes->descricao_projeto,
-            'bico_padrao'           => (string) ($atributes->bico_padrao ?? '0.4'),
-            'tempo_total_horas'     => $tempoTotalHoras,
-            'peso_total_gramas'     => $pesoTotalGramas,
         ]);
-
-        $this->_corService->persistCores((int) $newData->id, $cores);
 
         return (object) [
             'data'    => $this->getProjetoImpressaoId($newData->id),
@@ -149,27 +104,16 @@ class ProjetoImpressaoService
 
         $this->validateCodigoProjetoUnico($atributes->codigo_projeto, (int) $atributes->id);
 
-        $tempoTotalHoras = $this->_tempoService->converterParaHorasMinutos($atributes->tempo_total_horas);
-        $pesoTotalGramas = $this->_tempoService->normalizarValorNumerico($atributes->peso_total_gramas, 'O peso total do projeto');
-        $cores           = $atributes->cores ?? [];
-
-        $this->_corService->validarSomaPesos($cores, $pesoTotalGramas);
-
         $saved = $this->_repository->update($record, [
             'url_projeto'           => $atributes->url_projeto,
             'nome_original_projeto' => $atributes->nome_original_projeto,
             'codigo_projeto'        => $atributes->codigo_projeto,
             'descricao_projeto'     => $atributes->descricao_projeto,
-            'bico_padrao'           => (string) ($atributes->bico_padrao ?? '0.4'),
-            'tempo_total_horas'     => $tempoTotalHoras,
-            'peso_total_gramas'     => $pesoTotalGramas,
         ]);
 
         if (!$saved) {
             throw new Exception('Não foi possível editar o projeto de impressão', 500);
         }
-
-        $this->_corService->syncCores((int) $record->id, $cores);
 
         return (object) [
             'data'    => $this->getProjetoImpressaoId($atributes->id),
@@ -187,7 +131,6 @@ class ProjetoImpressaoService
         }
 
         $this->_parteService->deletePartesByProjeto((int) $record->id);
-        $this->_corService->deleteCoresByProjeto((int) $record->id);
 
         $saved = $this->_repository->delete($record);
 
@@ -202,10 +145,6 @@ class ProjetoImpressaoService
         ];
     }
 
-    // =========================================================
-    // QUERIES
-    // =========================================================
-
     public function getProjetoImpressaoPaginate(object $atributes): array
     {
         $query = DB::query();
@@ -216,9 +155,6 @@ class ProjetoImpressaoService
             'ent.nome_original_projeto',
             'ent.codigo_projeto',
             'ent.descricao_projeto',
-            'ent.bico_padrao',
-            'ent.tempo_total_horas',
-            'ent.peso_total_gramas',
             'ent.created_at',
         );
 
@@ -268,9 +204,6 @@ class ProjetoImpressaoService
                 'ent.nome_original_projeto',
                 'ent.codigo_projeto',
                 'ent.descricao_projeto',
-                'ent.bico_padrao',
-                'ent.tempo_total_horas',
-                'ent.peso_total_gramas',
                 'ent.created_at',
             )
             ->whereNull('ent.deleted_at')
@@ -281,8 +214,7 @@ class ProjetoImpressaoService
             throw new Exception('Projeto de impressão não encontrado', 404);
         }
 
-        $data           = collect($record)->toArray();
-        $data['cores']  = $this->_corService->getCoresByProjeto((int) $id);
+        $data = collect($record)->toArray();
         $data['partes'] = $this->_parteService->getPartesByProjeto((int) $id);
 
         return $data;
@@ -305,10 +237,6 @@ class ProjetoImpressaoService
 
         return $query->orderBy('ent.nome_original_projeto')->get()->toArray();
     }
-
-    // =========================================================
-    // HELPERS
-    // =========================================================
 
     private function validateCodigoProjetoUnico(string $codigo, ?int $ignoreId = null): void
     {

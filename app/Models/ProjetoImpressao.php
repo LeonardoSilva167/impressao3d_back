@@ -18,26 +18,16 @@ class ProjetoImpressao extends Model
         'nome_original_projeto',
         'codigo_projeto',
         'descricao_projeto',
-        'bico_padrao',
-        'tempo_total_horas',
-        'peso_total_gramas',
     ];
 
     protected $casts = [
-        'id'                 => 'integer',
-        'tempo_total_horas'  => 'string',
-        'peso_total_gramas'  => 'decimal:2',
-        'created_at'         => 'datetime',
-        'updated_at'         => 'datetime',
-        'deleted_at'         => 'datetime',
+        'id'         => 'integer',
+        'created_at' => 'datetime',
+        'updated_at' => 'datetime',
+        'deleted_at' => 'datetime',
     ];
 
     protected $dates = ['deleted_at'];
-
-    public function cores(): HasMany
-    {
-        return $this->hasMany(ProjetoImpressaoCor::class, 'id_projeto_impressao');
-    }
 
     public function partes(): HasMany
     {

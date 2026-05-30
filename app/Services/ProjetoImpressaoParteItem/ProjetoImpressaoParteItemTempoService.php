@@ -1,10 +1,10 @@
 <?php
 
-namespace App\Services\ProjetoImpressaoParte;
+namespace App\Services\ProjetoImpressaoParteItem;
 
 use Exception;
 
-class ProjetoImpressaoParteTempoService
+class ProjetoImpressaoParteItemTempoService
 {
     public function validarFormato(string $tempo): void
     {

@@ -141,9 +141,11 @@ class FilamentoRepository
                 'ent.resumo',
                 'ent.qtd',
                 'ent.preco_medio_grama',
+                'item.preco_medio_atual as item_preco_medio_atual',
                 'ent.created_at',
                 'tm.descricao as tipo_material_descricao',
                 'c.descricao as cor_descricao',
+                'c.hexadecimal as cor_hexadecimal',
                 'lm.descricao as linha_marca_descricao',
                 'm.descricao as marca_descricao',
             )
@@ -151,6 +153,10 @@ class FilamentoRepository
             ->join('cores as c', 'c.id', '=', 'ent.id_cor')
             ->join('linhas_marcas as lm', 'lm.id', '=', 'ent.id_linha_marca')
             ->join('marcas as m', 'm.id', '=', 'ent.id_marca')
+            ->leftJoin('itens as item', function ($join) {
+                $join->on('item.id', '=', 'ent.id_item')
+                    ->whereNull('item.deleted_at');
+            })
             ->whereNull('ent.deleted_at')
             ->whereNull('tm.deleted_at')
             ->whereNull('c.deleted_at')

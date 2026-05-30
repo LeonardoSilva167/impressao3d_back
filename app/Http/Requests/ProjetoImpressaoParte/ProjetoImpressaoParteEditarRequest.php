@@ -2,23 +2,17 @@
 
 namespace App\Http\Requests\ProjetoImpressaoParte;
 
-use App\Http\Requests\ProjetoImpressaoParte\Concerns\PreparesProjetoImpressaoPartePayload;
 use App\Http\Requests\ProjetoImpressaoParte\Concerns\ValidatesProjetoImpressaoParteCampos;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
 class ProjetoImpressaoParteEditarRequest extends FormRequest
 {
-    use PreparesProjetoImpressaoPartePayload, ValidatesProjetoImpressaoParteCampos;
+    use ValidatesProjetoImpressaoParteCampos;
 
     public function authorize(): bool
     {
         return true;
-    }
-
-    protected function prepareForValidation(): void
-    {
-        $this->prepareProjetoImpressaoPartePayload();
     }
 
     public function rules(): array

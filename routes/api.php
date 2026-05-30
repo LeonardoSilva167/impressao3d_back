@@ -29,6 +29,7 @@ Route::prefix('v1')->group(function () {
     Route::prefix('carreteis-finalizados')->group(function () {require __DIR__ . '/routerFiles/carreteisFinalizadosRouter.php';});// Rota de Carretéis Finalizados
     Route::prefix('projetos-impressao')->group(function () {require __DIR__ . '/routerFiles/projetosImpressaoRouter.php';});// Rota de Projetos de Impressão
     Route::prefix('projetos-impressao-partes')->group(function () {require __DIR__ . '/routerFiles/projetosImpressaoPartesRouter.php';});// Rota de Partes do Projeto de Impressão
+    Route::prefix('projetos-impressao-parte-itens')->group(function () {require __DIR__ . '/routerFiles/projetosImpressaoParteItensRouter.php';});// Rota de Itens da Parte do Projeto de Impressão
 // routes/api.php
 
 // Route::post('/pncp/edital', [PncpController::class, 'buscarEdital']);

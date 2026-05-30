@@ -1,10 +1,10 @@
 <?php
 
-namespace App\Services\ProjetoImpressaoParte;
+namespace App\Services\ProjetoImpressaoParteItem;
 
 use Exception;
 
-class ProjetoImpressaoParteCalculoService
+class ProjetoImpressaoParteItemCalculoService
 {
     public function normalizarPeso(mixed $valor, string $campo, bool $obrigatorio = false): float
     {

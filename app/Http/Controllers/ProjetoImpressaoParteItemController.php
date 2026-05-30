@@ -2,35 +2,29 @@
 
 namespace App\Http\Controllers;
 
-use App\Http\Requests\Filamento\FilamentoCadastrarRequest;
-use App\Http\Requests\Filamento\FilamentoEditarRequest;
-use App\Services\Filamento\FilamentoService;
+use App\Http\Requests\ProjetoImpressaoParteItem\ProjetoImpressaoParteItemCadastrarRequest;
+use App\Http\Requests\ProjetoImpressaoParteItem\ProjetoImpressaoParteItemEditarRequest;
+use App\Services\ProjetoImpressaoParteItem\ProjetoImpressaoParteItemService;
 use App\Services\RequestDataService;
 use Exception;
 use Illuminate\Http\Request;
 
-class FilamentoController extends Controller
+class ProjetoImpressaoParteItemController extends Controller
 {
-    /**
-     * @var FilamentoService $_service
-     */
-    private FilamentoService $_service;
+    private ProjetoImpressaoParteItemService $_service;
 
-    /**
-     * @var RequestDataService $_requestService
-     */
     protected $_requestService;
 
     public function __construct()
     {
-        $this->_service        = new FilamentoService();
+        $this->_service        = new ProjetoImpressaoParteItemService();
         $this->_requestService = new RequestDataService();
     }
 
-    public function listarLookupsFilamento()
+    public function listarLookupsProjetoImpressaoParteItem()
     {
         try {
-            $result = $this->_service->handleLookupsFilamento();
+            $result = $this->_service->handleLookupsProjetoImpressaoParteItem();
             return response()->json($result, 200);
         } catch (Exception $ex) {
             $statusCode = is_numeric($ex->getCode()) ? (int) $ex->getCode() : 500;
@@ -39,11 +33,11 @@ class FilamentoController extends Controller
         }
     }
 
-    public function listarFilamento(Request $request)
+    public function listarProjetoImpressaoParteItem(Request $request)
     {
         try {
             $objectAtributes = $this->_requestService->getAllParametersForQuery($request);
-            $result          = $this->_service->getFilamentoPaginate($objectAtributes);
+            $result          = $this->_service->getProjetoImpressaoParteItemPaginate($objectAtributes);
             return response()->json($result, 200);
         } catch (Exception $ex) {
             $statusCode = is_numeric($ex->getCode()) ? (int) $ex->getCode() : 500;
@@ -52,11 +46,10 @@ class FilamentoController extends Controller
         }
     }
 
-    public function listarFilamentoId(string $id)
+    public function listarProjetoImpressaoParteItemId(string $id)
     {
         try {
-            $result = $this->_service->getFilamentoId($id);
-
+            $result = $this->_service->getProjetoImpressaoParteItemId($id);
             return response()->json($result, 200);
         } catch (Exception $ex) {
             $statusCode = is_numeric($ex->getCode()) ? (int) $ex->getCode() : 500;
@@ -65,24 +58,11 @@ class FilamentoController extends Controller
         }
     }
 
-    public function createFilamento(FilamentoCadastrarRequest $request)
-    {
-        try {
-            $objectAtributes = (object) $request->validated();
-            $result          = $this->_service->handleAddFilamento($objectAtributes);
-            return response()->json($result, 200);
-        } catch (Exception $ex) {
-            $statusCode = is_numeric($ex->getCode()) ? (int) $ex->getCode() : 500;
-            $statusCode = ($statusCode >= 100 && $statusCode <= 599) ? $statusCode : 500;
-            return response()->json(['error' => true, 'message' => $ex->getMessage()], $statusCode);
-        }
-    }
-
-    public function editFilamento(FilamentoEditarRequest $request)
+    public function createProjetoImpressaoParteItem(ProjetoImpressaoParteItemCadastrarRequest $request)
     {
         try {
             $objectAtributes = (object) $request->validated();
-            $result          = $this->_service->handleEditFilamento($objectAtributes);
+            $result          = $this->_service->handleAddProjetoImpressaoParteItem($objectAtributes);
             return response()->json($result, 200);
         } catch (Exception $ex) {
             $statusCode = is_numeric($ex->getCode()) ? (int) $ex->getCode() : 500;
@@ -91,10 +71,11 @@ class FilamentoController extends Controller
         }
     }
 
-    public function deleteFilamento(string $id)
+    public function editProjetoImpressaoParteItem(ProjetoImpressaoParteItemEditarRequest $request)
     {
         try {
-            $result = $this->_service->handleDeleteFilamento($id);
+            $objectAtributes = (object) $request->validated();
+            $result          = $this->_service->handleEditProjetoImpressaoParteItem($objectAtributes);
             return response()->json($result, 200);
         } catch (Exception $ex) {
             $statusCode = is_numeric($ex->getCode()) ? (int) $ex->getCode() : 500;
@@ -103,11 +84,23 @@ class FilamentoController extends Controller
         }
     }
 
-    public function listarFilamentoAsync(Request $request)
+    public function deleteProjetoImpressaoParteItem(string $id)
+    {
+        try {
+            $result = $this->_service->handleDeleteProjetoImpressaoParteItem($id);
+            return response()->json($result, 200);
+        } catch (Exception $ex) {
+            $statusCode = is_numeric($ex->getCode()) ? (int) $ex->getCode() : 500;
+            $statusCode = ($statusCode >= 100 && $statusCode <= 599) ? $statusCode : 500;
+            return response()->json(['error' => true, 'message' => $ex->getMessage()], $statusCode);
+        }
+    }
+
+    public function listarProjetoImpressaoParteItemAsync(Request $request)
     {
         try {
             $params = (object) $request->all();
-            $result = $this->_service->getFilamentoAsync($params);
+            $result = $this->_service->getProjetoImpressaoParteItemAsync($params);
             return response()->json($result, 200);
         } catch (Exception $ex) {
             $statusCode = is_numeric($ex->getCode()) ? (int) $ex->getCode() : 500;

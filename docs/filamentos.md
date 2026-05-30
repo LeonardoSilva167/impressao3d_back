@@ -18,7 +18,8 @@ Cadastro especializado de filamentos, vinculado automaticamente a um item genér
 | codigo              | string  | Sim         | gerado automaticamente (`FIL-000001`)       |
 | resumo              | string  | Sim         | gerado automaticamente no backend           |
 | qtd                 | decimal | Não         | default `0`, mínimo `0`                     |
-| preco_medio_grama   | decimal | Não         | default `0`, mínimo `0`                     |
+| preco_medio_grama   | decimal | Não         | default `0`, mínimo `0`; campo manual no filamento |
+| (via item)          | —       | —           | `itens.preco_medio_atual` — preço real por grama (cache de compras/lotes); **prioridade na API** |
 
 ---
 
@@ -66,6 +67,37 @@ Cadastro especializado de filamentos, vinculado automaticamente a um item genér
 | PUT    | /filamentos/editar            | editFilamento            |
 | DELETE | /filamentos/excluir/{id}      | deleteFilamento          |
 | GET    | /filamentos/filamentos-list   | listarFilamentoAsync     |
+
+### Consulta individual — `GET /api/v1/filamentos/listar/{id}`
+
+Usado pelo cadastro de Projetos de Impressão para obter resumo, preço por grama e cor do filamento selecionado.
+
+**Resposta (200):**
+
+```json
+{
+  "id": 25,
+  "id_item": 25,
+  "resumo": "PETG PRETO PREMIUM VOOLT3D",
+  "preco_medio_por_grama": 0.0729,
+  "preco_medio_grama": 0.0729,
+  "preco_medio_atual": 0.0729,
+  "cor": {
+    "id": 10,
+    "descricao": "PRETO",
+    "hexadecimal": "#000000"
+  }
+}
+```
+
+**Erros:**
+
+| Status | Situação                                      |
+|--------|-----------------------------------------------|
+| 422    | ID inválido (`undefined`, vazio, não numérico)|
+| 404    | Filamento não encontrado ou excluído          |
+
+> `preco_medio_por_grama` e `preco_medio_grama` usam `itens.preco_medio_atual` quando o filamento possui `id_item` vinculado; caso contrário, usam `filamentos.preco_medio_grama`. O campo `preco_medio_atual` expõe o valor bruto do item.
 
 ---
 

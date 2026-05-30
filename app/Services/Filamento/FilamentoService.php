@@ -289,17 +289,75 @@ class FilamentoService
 
     public function getFilamentoId(int|string $id): array
     {
-        try {
-            $record = $this->_repository->findByIdWithRelations($id);
+        $idFilamento = $this->validarIdFilamento($id);
 
-            if (!$record) {
-                throw new Exception('Filamento não encontrado', 404);
-            }
+        $record = $this->_repository->findByIdWithRelations($idFilamento);
 
-            return collect($record)->toArray();
-        } catch (Exception $e) {
-            throw $e;
+        if (!$record) {
+            throw new Exception('Filamento não encontrado', 404);
         }
+
+        return $this->formatFilamentoDetalhe($record);
+    }
+
+    public function validarIdFilamento(int|string $id): int
+    {
+        $idNormalizado = is_string($id) ? trim($id) : (string) $id;
+
+        if (
+            $idNormalizado === ''
+            || in_array(strtolower($idNormalizado), ['undefined', 'null', 'nan'], true)
+            || !ctype_digit($idNormalizado)
+            || (int) $idNormalizado <= 0
+        ) {
+            throw new Exception('ID do filamento inválido.', 422);
+        }
+
+        return (int) $idNormalizado;
+    }
+
+    /**
+     * Preço por grama: prioriza itens.preco_medio_atual (cache de compras/lotes);
+     * fallback para filamentos.preco_medio_grama quando não houver item vinculado.
+     */
+    public static function resolverPrecoMedioPorGrama(
+        ?float $precoFilamento,
+        ?float $precoItem,
+        ?int $idItem = null
+    ): float {
+        if ($idItem && $precoItem !== null) {
+            return round((float) $precoItem, 4);
+        }
+
+        return round((float) ($precoFilamento ?? 0), 4);
+    }
+
+    /**
+     * Formato para consulta individual (ex.: cadastro de projetos de impressão).
+     */
+    public function formatFilamentoDetalhe(object $record): array
+    {
+        $precoMedioGrama = self::resolverPrecoMedioPorGrama(
+            isset($record->preco_medio_grama) ? (float) $record->preco_medio_grama : null,
+            isset($record->item_preco_medio_atual) ? (float) $record->item_preco_medio_atual : null,
+            !empty($record->id_item) ? (int) $record->id_item : null,
+        );
+
+        return [
+            'id'                    => (int) $record->id,
+            'id_item'               => (int) $record->id_item,
+            'resumo'                => $record->resumo,
+            'preco_medio_por_grama' => $precoMedioGrama,
+            'preco_medio_grama'     => $precoMedioGrama,
+            'preco_medio_atual'     => isset($record->item_preco_medio_atual)
+                ? round((float) $record->item_preco_medio_atual, 4)
+                : null,
+            'cor'                   => [
+                'id'          => (int) $record->id_cor,
+                'descricao'   => $record->cor_descricao,
+                'hexadecimal' => $record->cor_hexadecimal ?? null,
+            ],
+        ];
     }
 
     public function getFilamentoAsync(object $params): array
