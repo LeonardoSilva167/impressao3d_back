@@ -2,6 +2,7 @@
 
 namespace App\Services\GradeProduto;
 
+use App\Services\Custo\CustoCalculoService;
 use App\Services\ProdutoComposicao\ProdutoComposicaoCalculoService;
 use App\Services\ProjetoImpressaoParteItem\ProjetoImpressaoParteItemCalculoService;
 use Exception;
@@ -12,10 +13,13 @@ class GradeProdutoGeracaoService
 
     private ProjetoImpressaoParteItemCalculoService $_itemCalculoService;
 
+    private CustoCalculoService $_custoService;
+
     public function __construct()
     {
         $this->_calculoService     = new ProdutoComposicaoCalculoService();
         $this->_itemCalculoService = new ProjetoImpressaoParteItemCalculoService();
+        $this->_custoService       = new CustoCalculoService();
     }
 
     /**
@@ -118,7 +122,10 @@ class GradeProdutoGeracaoService
             'cor_descricao'   => $variacao->cor_descricao,
             'cor_codigo'      => $variacao->cor_codigo,
             'peso_item'       => isset($variacao->peso_item) ? (float) $variacao->peso_item : null,
-            'custo_item'      => isset($variacao->custo_item) ? (float) $variacao->custo_item : null,
+            'custo_filamento' => isset($variacao->custo_filamento) ? (float) $variacao->custo_filamento : null,
+            'custo_energia'   => isset($variacao->custo_energia) ? (float) $variacao->custo_energia : null,
+            'custo_desgaste'  => isset($variacao->custo_desgaste) ? (float) $variacao->custo_desgaste : null,
+            'custo_total'     => isset($variacao->custo_total) ? (float) $variacao->custo_total : null,
             'tempo_impressao' => $variacao->tempo_impressao ?? null,
             'peso_parte'      => isset($variacao->peso_parte) ? (float) $variacao->peso_parte : null,
             'peso_suporte'    => isset($variacao->peso_suporte) ? (float) $variacao->peso_suporte : null,
@@ -209,7 +216,7 @@ class GradeProdutoGeracaoService
 
                 $peso = $this->resolverPesoVariacao($variacao, $itensProjetoPorId[$idItem] ?? null);
                 $pesos[] = $peso;
-                $custos[] = $this->resolverCustoVariacao($variacao, $peso, $itensProjetoPorId[$idItem] ?? null);
+                $custos[] = $this->resolverCustosVariacao($variacao, $itensProjetoPorId[$idItem] ?? null);
 
                 $tempo = $variacao['tempo_impressao']
                     ?? ($itensProjetoPorId[$idItem]->tempo_impressao ?? '00:00');
@@ -222,14 +229,18 @@ class GradeProdutoGeracaoService
 
         $nomeProduto = $descricaoProduto . ' - ' . implode(' - ', $segmentosNome);
         $sku         = $skuBase . '-' . implode('-', $codigosSku);
+        $custosTotal = $this->_custoService->somarCustos($custos);
 
         return [
-            'nome_produto' => $nomeProduto,
-            'sku'          => $sku,
-            'peso_total'   => round(array_sum($pesos), 2),
-            'tempo_total'  => $this->_calculoService->somarTempos($tempos),
-            'custo_total'  => $this->_calculoService->calcularCustoTotal($custos),
-            'combinacao'   => $variacoesFlat,
+            'nome_produto'    => $nomeProduto,
+            'sku'             => $sku,
+            'peso_total'      => round(array_sum($pesos), 2),
+            'tempo_total'     => $this->_calculoService->somarTempos($tempos),
+            'custo_filamento' => $custosTotal['custo_filamento'],
+            'custo_energia'   => $custosTotal['custo_energia'],
+            'custo_desgaste'  => $custosTotal['custo_desgaste'],
+            'custo_total'     => $custosTotal['custo_total'],
+            'combinacao'      => $variacoesFlat,
         ];
     }
 
@@ -260,12 +271,25 @@ class GradeProdutoGeracaoService
         return 0.0;
     }
 
-    private function resolverCustoVariacao(array $variacao, float $peso, ?object $itemProjeto): float
+    /**
+     * @return array{custo_filamento: float, custo_energia: float, custo_desgaste: float, custo_total: float}
+     */
+    private function resolverCustosVariacao(array $variacao, ?object $itemProjeto): array
     {
-        if ($variacao['custo_item'] !== null && $variacao['custo_item'] > 0) {
-            return round($variacao['custo_item'], 4);
+        if ($variacao['custo_total'] !== null && $variacao['custo_total'] > 0) {
+            return [
+                'custo_filamento' => round((float) ($variacao['custo_filamento'] ?? 0), 4),
+                'custo_energia'   => round((float) ($variacao['custo_energia'] ?? 0), 4),
+                'custo_desgaste'  => round((float) ($variacao['custo_desgaste'] ?? 0), 4),
+                'custo_total'     => round((float) $variacao['custo_total'], 4),
+            ];
         }
 
-        return 0.0;
+        return [
+            'custo_filamento' => 0.0,
+            'custo_energia'   => 0.0,
+            'custo_desgaste'  => 0.0,
+            'custo_total'     => 0.0,
+        ];
     }
 }

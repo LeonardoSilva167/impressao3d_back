@@ -35,12 +35,20 @@ class ProjetoImpressaoParteItem extends Model
         'usa_engomagem',
         'velocidade_engomagem',
         'fluxo_engomagem',
+        'custo_filamento',
+        'custo_energia',
+        'custo_desgaste',
+        'custo_total',
     ];
 
     protected $casts = [
         'id'                         => 'integer',
         'id_projeto_impressao_parte' => 'integer',
         'id_cor'                     => 'integer',
+        'custo_filamento'            => 'decimal:4',
+        'custo_energia'              => 'decimal:4',
+        'custo_desgaste'             => 'decimal:4',
+        'custo_total'                => 'decimal:4',
         'altura_camada'              => 'decimal:2',
         'temperatura_bico'           => 'integer',
         'temperatura_mesa'           => 'integer',

@@ -14,11 +14,15 @@ class Configuracao extends Model
 
     protected $fillable = [
         'proximo_codigo_base',
+        'custo_energia_kwh',
+        'custo_desgaste_hora',
     ];
 
     protected $casts = [
         'id'                  => 'integer',
         'proximo_codigo_base' => 'integer',
+        'custo_energia_kwh'   => 'decimal:4',
+        'custo_desgaste_hora' => 'decimal:4',
         'created_at'          => 'datetime',
         'updated_at'          => 'datetime',
         'deleted_at'          => 'datetime',

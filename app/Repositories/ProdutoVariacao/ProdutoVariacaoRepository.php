@@ -76,7 +76,11 @@ class ProdutoVariacaoRepository
                 'pvf.id_filamento',
                 'pvf.preco_medio_grama',
                 'pvf.peso_item',
-                'pvf.custo_item',
+                'pvf.custo_filamento',
+                'pvf.custo_energia',
+                'pvf.custo_desgaste',
+                'pvf.custo_total',
+                'item.tempo_impressao',
                 'fil.resumo as filamento_resumo',
             )
             ->join('projetos_impressao_parte_itens as item', 'item.id', '=', 'pv.id_item_projeto')

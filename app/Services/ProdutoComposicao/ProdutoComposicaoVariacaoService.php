@@ -4,12 +4,15 @@ namespace App\Services\ProdutoComposicao;
 
 use App\Models\ProdutoVariacao;
 use App\Repositories\Filamento\FilamentoRepository;
+use App\Repositories\Configuracao\ConfiguracaoRepository;
 use App\Repositories\ProdutoComposicaoCor\ProdutoComposicaoCorRepository;
 use App\Repositories\ProdutoVariacao\ProdutoVariacaoRepository;
 use App\Repositories\ProdutoVariacaoFilamento\ProdutoVariacaoFilamentoRepository;
 use App\Services\Filamento\FilamentoService;
+use App\Services\Custo\CustoCalculoService;
 use App\Services\ProjetoImpressaoParteItem\ProjetoImpressaoParteItemCalculoService;
 use Exception;
+use Illuminate\Support\Facades\DB;
 
 class ProdutoComposicaoVariacaoService
 {
@@ -25,14 +28,20 @@ class ProdutoComposicaoVariacaoService
 
     private ProjetoImpressaoParteItemCalculoService $_itemCalculoService;
 
+    private ConfiguracaoRepository $_configuracaoRepository;
+
+    private CustoCalculoService $_custoService;
+
     public function __construct()
     {
-        $this->_variacaoRepository   = new ProdutoVariacaoRepository();
-        $this->_filamentoRepository  = new ProdutoVariacaoFilamentoRepository();
-        $this->_corRepository        = new ProdutoComposicaoCorRepository();
-        $this->_filamentoRepo        = new FilamentoRepository();
-        $this->_calculoService       = new ProdutoComposicaoCalculoService();
-        $this->_itemCalculoService   = new ProjetoImpressaoParteItemCalculoService();
+        $this->_variacaoRepository      = new ProdutoVariacaoRepository();
+        $this->_filamentoRepository     = new ProdutoVariacaoFilamentoRepository();
+        $this->_corRepository           = new ProdutoComposicaoCorRepository();
+        $this->_filamentoRepo           = new FilamentoRepository();
+        $this->_calculoService          = new ProdutoComposicaoCalculoService();
+        $this->_itemCalculoService      = new ProjetoImpressaoParteItemCalculoService();
+        $this->_configuracaoRepository  = new ConfiguracaoRepository();
+        $this->_custoService            = new CustoCalculoService();
     }
 
     public function gerarVariacoesPreview(int $idComposicao, ?int $idParte = null, ?int $idItemProjeto = null): array
@@ -122,6 +131,8 @@ class ProdutoComposicaoVariacaoService
         }
 
         $idsProcessados = [];
+        $configCustos   = $this->_configuracaoRepository->getCustosConfig();
+        $temposPorItem  = $this->carregarTemposItensPorVariacoes($variacoes);
 
         foreach ($filamentosPayload as $payload) {
             $payload    = (object) $payload;
@@ -157,14 +168,27 @@ class ProdutoComposicaoVariacaoService
                     !empty($filamento->id_item) ? (int) $filamento->id_item : null,
                 );
 
-            $custoItem = $this->_calculoService->calcularCustoItem($pesoItem, $precoMedioGrama);
+
+            $variacao       = $variacoesPorId[$idVariacao];
+            $tempoImpressao = $temposPorItem[(int) $variacao->id_item_projeto] ?? '00:00';
+
+            $custos = $this->_custoService->calcularCustosCompletos(
+                $pesoItem,
+                $precoMedioGrama,
+                $tempoImpressao,
+                $configCustos['custo_energia_kwh'],
+                $configCustos['custo_desgaste_hora'],
+            );
 
             $this->_filamentoRepository->create([
                 'id_variacao'       => $idVariacao,
                 'id_filamento'      => (int) $payload->id_filamento,
                 'preco_medio_grama' => $precoMedioGrama,
                 'peso_item'         => $pesoItem,
-                'custo_item'        => $custoItem,
+                'custo_filamento'   => $custos['custo_filamento'],
+                'custo_energia'     => $custos['custo_energia'],
+                'custo_desgaste'    => $custos['custo_desgaste'],
+                'custo_total'       => $custos['custo_total'],
             ]);
         }
 
@@ -243,8 +267,11 @@ class ProdutoComposicaoVariacaoService
                 'codigo'      => $variacao->cor_codigo,
                 'hexadecimal' => $variacao->cor_hexadecimal ?? null,
             ],
-            'custo_item'         => round((float) ($variacao->custo_item ?? 0), 4),
-            'filamento'          => null,
+            'custo_filamento'  => round((float) ($variacao->custo_filamento ?? 0), 4),
+            'custo_energia'    => round((float) ($variacao->custo_energia ?? 0), 4),
+            'custo_desgaste'   => round((float) ($variacao->custo_desgaste ?? 0), 4),
+            'custo_total'      => round((float) ($variacao->custo_total ?? 0), 4),
+            'filamento'        => null,
         ];
 
         if (!empty($variacao->id_filamento)) {
@@ -253,10 +280,36 @@ class ProdutoComposicaoVariacaoService
                 'resumo'            => $variacao->filamento_resumo,
                 'preco_medio_grama' => round((float) $variacao->preco_medio_grama, 4),
                 'peso_item'         => round((float) $variacao->peso_item, 2),
-                'custo_item'        => round((float) $variacao->custo_item, 4),
+                'custo_filamento'   => round((float) $variacao->custo_filamento, 4),
+                'custo_energia'     => round((float) ($variacao->custo_energia ?? 0), 4),
+                'custo_desgaste'    => round((float) ($variacao->custo_desgaste ?? 0), 4),
+                'custo_total'       => round((float) ($variacao->custo_total ?? 0), 4),
             ];
         }
 
         return $result;
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function carregarTemposItensPorVariacoes($variacoes): array
+    {
+        $idsItens = $variacoes->pluck('id_item_projeto')
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values()
+            ->toArray();
+
+        if (empty($idsItens)) {
+            return [];
+        }
+
+        return DB::table('projetos_impressao_parte_itens')
+            ->whereIn('id', $idsItens)
+            ->whereNull('deleted_at')
+            ->pluck('tempo_impressao', 'id')
+            ->map(fn ($tempo) => (string) $tempo)
+            ->toArray();
     }
 }

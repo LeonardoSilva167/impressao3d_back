@@ -7,6 +7,7 @@ use App\Models\ProjetoImpressaoParte;
 use App\Repositories\ProjetoImpressao\ProjetoImpressaoRepository;
 use App\Repositories\ProjetoImpressaoParte\ProjetoImpressaoParteRepository;
 use App\Services\PaginateService;
+use App\Services\ProjetoImpressao\ProjetoImpressaoCustoService;
 use App\Services\ProjetoImpressaoParteItem\ProjetoImpressaoParteItemService;
 use Exception;
 use Illuminate\Support\Facades\DB;
@@ -19,11 +20,14 @@ class ProjetoImpressaoParteService
 
     private ProjetoImpressaoParteItemService $_itemService;
 
+    private ProjetoImpressaoCustoService $_custoService;
+
     public function __construct()
     {
         $this->_repository        = new ProjetoImpressaoParteRepository();
         $this->_projetoRepository = new ProjetoImpressaoRepository();
         $this->_itemService       = new ProjetoImpressaoParteItemService();
+        $this->_custoService      = new ProjetoImpressaoCustoService();
     }
 
     public function handleLookupsProjetoImpressaoParte(): array
@@ -136,6 +140,8 @@ class ProjetoImpressaoParteService
             throw new Exception('Parte do projeto não encontrada', 404);
         }
 
+        $idProjeto = (int) $record->id_projeto_impressao;
+
         $this->_itemService->deleteItensByParte((int) $record->id);
 
         $saved = $this->_repository->delete($record);
@@ -143,6 +149,8 @@ class ProjetoImpressaoParteService
         if (!$saved) {
             throw new Exception('Não foi possível excluir a parte do projeto', 500);
         }
+
+        $this->_custoService->recalcularCustosProjeto($idProjeto);
 
         return (object) [
             'data'    => [],
@@ -172,6 +180,10 @@ class ProjetoImpressaoParteService
             'proj.nome_original_projeto',
             'proj.codigo_projeto',
             'ent.nome_parte',
+            'ent.custo_filamento',
+            'ent.custo_energia',
+            'ent.custo_desgaste',
+            'ent.custo_total',
             'ent.created_at',
         );
 
@@ -223,6 +235,10 @@ class ProjetoImpressaoParteService
                 'ent.id',
                 'ent.id_projeto_impressao',
                 'ent.nome_parte',
+                'ent.custo_filamento',
+                'ent.custo_energia',
+                'ent.custo_desgaste',
+                'ent.custo_total',
                 'ent.created_at',
                 'ent.updated_at',
                 'proj.nome_original_projeto',

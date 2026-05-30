@@ -155,6 +155,10 @@ class ProjetoImpressaoService
             'ent.nome_original_projeto',
             'ent.codigo_projeto',
             'ent.descricao_projeto',
+            'ent.custo_filamento',
+            'ent.custo_energia',
+            'ent.custo_desgaste',
+            'ent.custo_total',
             'ent.created_at',
         );
 
@@ -204,6 +208,10 @@ class ProjetoImpressaoService
                 'ent.nome_original_projeto',
                 'ent.codigo_projeto',
                 'ent.descricao_projeto',
+                'ent.custo_filamento',
+                'ent.custo_energia',
+                'ent.custo_desgaste',
+                'ent.custo_total',
                 'ent.created_at',
             )
             ->whereNull('ent.deleted_at')

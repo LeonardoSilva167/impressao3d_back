@@ -31,4 +31,21 @@ class ConfiguracaoRepository
 
         return (int) ($valor ?? 1000);
     }
+
+    /**
+     * @return array{custo_energia_kwh: float, custo_desgaste_hora: float}
+     */
+    public function getCustosConfig(): array
+    {
+        $configuracao = Configuracao::whereNull('deleted_at')->first();
+
+        if (!$configuracao) {
+            throw new \RuntimeException('Configuração do sistema não encontrada.', 500);
+        }
+
+        return [
+            'custo_energia_kwh'   => round((float) $configuracao->custo_energia_kwh, 4),
+            'custo_desgaste_hora' => round((float) $configuracao->custo_desgaste_hora, 4),
+        ];
+    }
 }

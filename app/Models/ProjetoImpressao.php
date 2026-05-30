@@ -18,10 +18,18 @@ class ProjetoImpressao extends Model
         'nome_original_projeto',
         'codigo_projeto',
         'descricao_projeto',
+        'custo_filamento',
+        'custo_energia',
+        'custo_desgaste',
+        'custo_total',
     ];
 
     protected $casts = [
-        'id'         => 'integer',
+        'id'              => 'integer',
+        'custo_filamento' => 'decimal:4',
+        'custo_energia'   => 'decimal:4',
+        'custo_desgaste'  => 'decimal:4',
+        'custo_total'     => 'decimal:4',
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
         'deleted_at' => 'datetime',

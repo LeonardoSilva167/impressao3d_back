@@ -2,13 +2,21 @@
 
 namespace App\Services\ProdutoComposicao;
 
+use App\Services\Custo\CustoCalculoService;
 use Exception;
 
 class ProdutoComposicaoCalculoService
 {
+    private CustoCalculoService $_custoService;
+
+    public function __construct()
+    {
+        $this->_custoService = new CustoCalculoService();
+    }
+
     public function calcularCustoItem(float $pesoTotal, float $precoMedioGrama): float
     {
-        return round($pesoTotal * $precoMedioGrama, 4);
+        return $this->_custoService->calcularCustoFilamento($pesoTotal, $precoMedioGrama);
     }
 
     public function calcularCustoTotal(array $custosItens): float
@@ -16,13 +24,22 @@ class ProdutoComposicaoCalculoService
         return round(array_sum($custosItens), 4);
     }
 
+    public function tempoParaHorasDecimais(string $tempo): float
+    {
+        return $this->_custoService->tempoParaHorasDecimais($tempo);
+    }
+
     public function tempoParaMinutos(string $tempo): int
     {
-        if (!preg_match('/^\d{2}:\d{2}$/', $tempo)) {
+        if (!preg_match('/^\d{1,2}:\d{2}$/', $tempo)) {
             throw new Exception('Tempo de impressão inválido: ' . $tempo, 422);
         }
 
         [$horas, $minutos] = array_map('intval', explode(':', $tempo));
+
+        if ($minutos > 59) {
+            throw new Exception('Tempo de impressão inválido: ' . $tempo, 422);
+        }
 
         return ($horas * 60) + $minutos;
     }

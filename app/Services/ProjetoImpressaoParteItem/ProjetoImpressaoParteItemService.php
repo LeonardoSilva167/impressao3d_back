@@ -8,6 +8,7 @@ use App\Models\ProjetoImpressaoParteItem;
 use App\Repositories\ProjetoImpressaoParte\ProjetoImpressaoParteRepository;
 use App\Repositories\ProjetoImpressaoParteItem\ProjetoImpressaoParteItemRepository;
 use App\Services\PaginateService;
+use App\Services\ProjetoImpressao\ProjetoImpressaoCustoService;
 use Exception;
 use Illuminate\Support\Facades\DB;
 
@@ -21,12 +22,15 @@ class ProjetoImpressaoParteItemService
 
     private ProjetoImpressaoParteRepository $_parteRepository;
 
+    private ProjetoImpressaoCustoService $_custoService;
+
     public function __construct()
     {
         $this->_repository       = new ProjetoImpressaoParteItemRepository();
         $this->_tempoService     = new ProjetoImpressaoParteItemTempoService();
         $this->_calculoService   = new ProjetoImpressaoParteItemCalculoService();
         $this->_parteRepository  = new ProjetoImpressaoParteRepository();
+        $this->_custoService     = new ProjetoImpressaoCustoService();
     }
 
     public function handleLookupsProjetoImpressaoParteItem(): array
@@ -102,6 +106,7 @@ class ProjetoImpressaoParteItemService
         $this->_tempoService->validarFormato((string) $atributes->tempo_impressao);
 
         $newData = $this->_repository->create($this->buildItemData($atributes));
+        $this->_custoService->recalcularCustosItem((int) $newData->id);
 
         return (object) [
             'data'    => $this->getProjetoImpressaoParteItemId($newData->id),
@@ -127,6 +132,8 @@ class ProjetoImpressaoParteItemService
             throw new Exception('Não foi possível editar o item da parte', 500);
         }
 
+        $this->_custoService->recalcularCustosItem((int) $atributes->id);
+
         return (object) [
             'data'    => $this->getProjetoImpressaoParteItemId($atributes->id),
             'status'  => true,
@@ -142,11 +149,15 @@ class ProjetoImpressaoParteItemService
             throw new Exception('Item da parte não encontrado', 404);
         }
 
+        $idParte = (int) $record->id_projeto_impressao_parte;
+
         $saved = $this->_repository->delete($record);
 
         if (!$saved) {
             throw new Exception('Não foi possível excluir o item da parte', 500);
         }
+
+        $this->_custoService->recalcularCustosParte($idParte);
 
         return (object) [
             'data'    => [],
@@ -186,6 +197,10 @@ class ProjetoImpressaoParteItemService
             'ent.peso_suporte',
             'ent.peso_corado',
             'ent.peso_torre',
+            'ent.custo_filamento',
+            'ent.custo_energia',
+            'ent.custo_desgaste',
+            'ent.custo_total',
             'ent.usa_suporte',
             'ent.usa_brim',
             'ent.usa_engomagem',

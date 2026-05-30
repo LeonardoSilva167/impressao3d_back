@@ -648,7 +648,7 @@ class GradeProdutoService
             }
 
             $variacoesComFilamento = $variacoes->filter(function ($variacao) {
-                return !empty($variacao->id_filamento) && !empty($variacao->custo_item);
+                return !empty($variacao->id_filamento) && !empty($variacao->custo_total);
             });
 
             if ($variacoesComFilamento->isEmpty()) {
@@ -890,6 +890,9 @@ class GradeProdutoService
                 'sku'              => $produto['sku'],
                 'peso_total'       => $produto['peso_total'],
                 'tempo_total'      => $produto['tempo_total'],
+                'custo_filamento'  => $produto['custo_filamento'],
+                'custo_energia'    => $produto['custo_energia'],
+                'custo_desgaste'   => $produto['custo_desgaste'],
                 'custo_total'      => $produto['custo_total'],
                 'status'           => true,
             ]);
