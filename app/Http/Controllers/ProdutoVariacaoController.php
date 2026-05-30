@@ -2,72 +2,28 @@
 
 namespace App\Http\Controllers;
 
-use App\Services\Produtos\ProdutosService;
+use App\Http\Requests\ProdutoVariacao\ProdutoVariacaoCadastrarRequest;
+use App\Http\Requests\ProdutoVariacao\ProdutoVariacaoEditarRequest;
+use App\Services\ProdutoVariacao\ProdutoVariacaoService;
 use App\Services\RequestDataService;
 use Exception;
 use Illuminate\Http\Request;
 
-class ProdutosController extends Controller
+class ProdutoVariacaoController extends Controller
 {
-       /**
-     * @var ProdutosService $_service
-     */
-    private ProdutosService $_service;
-    
-    /**
-     * @var RequestDataService
-     */
+    private ProdutoVariacaoService $_service;
     protected $_requestService;
 
-    public function __construct(){
-        $this->_service = new ProdutosService();
+    public function __construct()
+    {
+        $this->_service        = new ProdutoVariacaoService();
         $this->_requestService = new RequestDataService();
     }
 
-
-    public function listarLookupsProdutos()
+    public function listarLookupsProdutoVariacao()
     {
         try {
-            $result = $this->_service->listarLookupsProdutos();
-    
-            return response()->json($result, 200);
-        } catch (\Exception $ex) {
-            $statusCode = is_numeric($ex->getCode()) ? (int) $ex->getCode() : 500;
-            $statusCode = ($statusCode >= 100 && $statusCode <= 599) ? $statusCode : 500;
-            return response()->json(['error' => true, 'message' => $ex->getMessage()], $statusCode);
-        }
-    }
-
-    public function createProdutos(Request $request)
-    {
-        try {
-            $objectAtributes = (object) $request->all();
-            $result = $this->_service->handleAddProdutos($objectAtributes);
-            return response()->json($result, 200);
-        } catch (\Exception $ex) {
-            $statusCode = is_numeric($ex->getCode()) ? (int) $ex->getCode() : 500;
-            $statusCode = ($statusCode >= 100 && $statusCode <= 599) ? $statusCode : 500;
-            return response()->json(['error' => true, 'message' => $ex->getMessage()], $statusCode);
-        }
-    }
-
-    public function editProdutos(Request $request)
-    {
-        try {
-            $objectAtributes = (object) $request->all();
-            $result = $this->_service->handleEditProdutos($objectAtributes);
-            return response()->json($result, 200);
-        } catch (\Exception $ex) {
-            $statusCode = is_numeric($ex->getCode()) ? (int) $ex->getCode() : 500;
-            $statusCode = ($statusCode >= 100 && $statusCode <= 599) ? $statusCode : 500;
-            return response()->json(['error' => true, 'message' => $ex->getMessage()], $statusCode);
-        }
-    }
-
-    public function deleteProdutos($id_Produtos)
-    {
-        try {
-            $result = $this->_service->handleDeleteProdutos($id_Produtos);
+            $result = $this->_service->handleLookupsProdutoVariacao();
             return response()->json($result, 200);
         } catch (Exception $ex) {
             $statusCode = is_numeric($ex->getCode()) ? (int) $ex->getCode() : 500;
@@ -76,11 +32,11 @@ class ProdutosController extends Controller
         }
     }
 
-    public function listarProdutos(Request $request)
+    public function listarProdutoVariacao(Request $request)
     {
         try {
             $objectAtributes = $this->_requestService->getAllParametersForQuery($request);
-            $result = $this->_service->getProdutosPaginate($objectAtributes);
+            $result          = $this->_service->getProdutoVariacaoPaginate($objectAtributes);
             return response()->json($result, 200);
         } catch (Exception $ex) {
             $statusCode = is_numeric($ex->getCode()) ? (int) $ex->getCode() : 500;
@@ -89,10 +45,10 @@ class ProdutosController extends Controller
         }
     }
 
-    public function listarProdutosId(string $id_Produtos)
+    public function listarProdutoVariacaoId(string $id)
     {
         try {
-            $result = $this->_service->getProdutosId($id_Produtos);
+            $result = $this->_service->getProdutoVariacaoId($id);
             return response()->json($result, 200);
         } catch (Exception $ex) {
             $statusCode = is_numeric($ex->getCode()) ? (int) $ex->getCode() : 500;
@@ -101,11 +57,11 @@ class ProdutosController extends Controller
         }
     }
 
-    public function listarProdutosAsync(Request $request)
+    public function createProdutoVariacao(ProdutoVariacaoCadastrarRequest $request)
     {
         try {
-            $params = (object)$request->all();
-            $result = $this->_service->getProdutossAsync($params);
+            $objectAtributes = (object) $request->validated();
+            $result          = $this->_service->handleAddProdutoVariacao($objectAtributes);
             return response()->json($result, 200);
         } catch (Exception $ex) {
             $statusCode = is_numeric($ex->getCode()) ? (int) $ex->getCode() : 500;
@@ -113,5 +69,42 @@ class ProdutosController extends Controller
             return response()->json(['error' => true, 'message' => $ex->getMessage()], $statusCode);
         }
     }
-    
+
+    public function editProdutoVariacao(ProdutoVariacaoEditarRequest $request)
+    {
+        try {
+            $objectAtributes = (object) $request->validated();
+            $result          = $this->_service->handleEditProdutoVariacao($objectAtributes);
+            return response()->json($result, 200);
+        } catch (Exception $ex) {
+            $statusCode = is_numeric($ex->getCode()) ? (int) $ex->getCode() : 500;
+            $statusCode = ($statusCode >= 100 && $statusCode <= 599) ? $statusCode : 500;
+            return response()->json(['error' => true, 'message' => $ex->getMessage()], $statusCode);
+        }
+    }
+
+    public function deleteProdutoVariacao(string $id)
+    {
+        try {
+            $result = $this->_service->handleDeleteProdutoVariacao($id);
+            return response()->json($result, 200);
+        } catch (Exception $ex) {
+            $statusCode = is_numeric($ex->getCode()) ? (int) $ex->getCode() : 500;
+            $statusCode = ($statusCode >= 100 && $statusCode <= 599) ? $statusCode : 500;
+            return response()->json(['error' => true, 'message' => $ex->getMessage()], $statusCode);
+        }
+    }
+
+    public function listarProdutoVariacaoAsync(Request $request)
+    {
+        try {
+            $params = (object) $request->all();
+            $result = $this->_service->getProdutoVariacaoAsync($params);
+            return response()->json($result, 200);
+        } catch (Exception $ex) {
+            $statusCode = is_numeric($ex->getCode()) ? (int) $ex->getCode() : 500;
+            $statusCode = ($statusCode >= 100 && $statusCode <= 599) ? $statusCode : 500;
+            return response()->json(['error' => true, 'message' => $ex->getMessage()], $statusCode);
+        }
+    }
 }

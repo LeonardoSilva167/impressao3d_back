@@ -30,13 +30,13 @@ Route::prefix('v1')->group(function () {
     Route::prefix('projetos-impressao')->group(function () {require __DIR__ . '/routerFiles/projetosImpressaoRouter.php';});// Rota de Projetos de Impressão
     Route::prefix('projetos-impressao-partes')->group(function () {require __DIR__ . '/routerFiles/projetosImpressaoPartesRouter.php';});// Rota de Partes do Projeto de Impressão
     Route::prefix('projetos-impressao-parte-itens')->group(function () {require __DIR__ . '/routerFiles/projetosImpressaoParteItensRouter.php';});// Rota de Itens da Parte do Projeto de Impressão
+    Route::prefix('categorias-produtos')->group(function () {require __DIR__ . '/routerFiles/categoriasProdutosRouter.php';});// Rota de Categorias de Produtos
+    Route::prefix('modelos-produtos')->group(function () {require __DIR__ . '/routerFiles/modelosProdutosRouter.php';});// Rota de Modelos de Produtos
+    Route::prefix('linhas-produtos')->group(function () {require __DIR__ . '/routerFiles/linhasProdutosRouter.php';});// Rota de Linhas de Produtos
+    Route::prefix('partes-base-produtos')->group(function () {require __DIR__ . '/routerFiles/partesBaseProdutosRouter.php';});// Rota de Partes Base de Produtos
+    Route::prefix('produtos')->group(function () {require __DIR__ . '/routerFiles/produtosRouter.php';});// Rota de Produtos Base
+    Route::prefix('produto-variacoes')->group(function () {require __DIR__ . '/routerFiles/produtoVariacoesRouter.php';});// Rota de Variações de Produto
 // routes/api.php
-
-// Route::post('/pncp/edital', [PncpController::class, 'buscarEdital']);
-
-    // Route::prefix('linhas-produtos')->group(function () {require __DIR__ . '/routerFiles/linhaProdutosRouter.php';});// Rota de Linhas de Produtos
-    // Route::prefix('produtos')->group(function () {require __DIR__ . '/routerFiles/produtosRouter.php';});// Rota de Produtos
-    // Route::prefix('grades-produtos')->group(function () {require __DIR__ . '/routerFiles/gradeProdutosRouter.php';});// Rota de Grades de Produtos
     
     // Route::prefix('despesas')->group(function () {require __DIR__ . '/routerFiles/despesaRouter.php';});// Rota de despesas
     // Route::prefix('contas-pagar')->group(function () {require __DIR__ . '/routerFiles/contasPagarRouter.php';   });// Rota de contas-pagar

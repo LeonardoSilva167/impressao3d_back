@@ -1,12 +1,12 @@
 <?php
 
-use App\Http\Controllers\ProdutosController;
+use App\Http\Controllers\ProdutoBaseController;
 use Illuminate\Support\Facades\Route;
 
-Route::get('/lookups', [ProdutosController::class, 'listarLookupsProdutos']);
-Route::get('/listar', [ProdutosController::class, 'listarProdutos']);
-Route::get('/listar/{id}', [ProdutosController::class, 'listarDespesaId']);
-Route::post('/cadastrar', [ProdutosController::class, 'createProdutos']);
-Route::put('/editar', [ProdutosController::class, 'editProdutos']);
-Route::delete('/excluir/{id}', [ProdutosController::class, 'deleteProdutos']);
-Route::get('/produtos-list', [ProdutosController::class, 'listarProdutosAsync']);
+Route::get('/lookups',              [ProdutoBaseController::class, 'listarLookupsProdutoBase']);
+Route::get('/listar',               [ProdutoBaseController::class, 'listarProdutoBase']);
+Route::get('/listar/{id}',          [ProdutoBaseController::class, 'listarProdutoBaseId']);
+Route::post('/cadastrar',           [ProdutoBaseController::class, 'createProdutoBase']);
+Route::put('/editar',               [ProdutoBaseController::class, 'editProdutoBase']);
+Route::delete('/excluir/{id}',      [ProdutoBaseController::class, 'deleteProdutoBase']);
+Route::get('/produtos-list',        [ProdutoBaseController::class, 'listarProdutoBaseAsync']);
