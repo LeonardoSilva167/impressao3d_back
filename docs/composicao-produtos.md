@@ -2,14 +2,27 @@
 
 ## Descrição
 
-Vincula **Produto Base**, **Variações** e **Projeto de Impressão** para definir o custo real de fabricação. O projeto de impressão possui apenas informações técnicas e estimativas; o custo real é calculado e persistido na composição.
+Vincula **Produto Base** e **Projeto de Impressão**. A composição **não gera produtos finais, SKUs finais ou combinações entre itens**. Ela apenas:
 
-A composição é responsável por:
+1. Cadastra a composição (produto + projeto)
+2. Permite configurar cores **por item da parte** (Primária, Secundária, Terciária)
+3. Gera **variações individuais** de cada item (ex.: Base Tampa → Rosa)
+4. Vincula filamentos e calcula custo individual por variação
 
-- vincular Produto Base e Projeto de Impressão
-- vincular cada item do projeto a um filamento, por variação
-- calcular o custo individual de cada item
-- calcular o custo total e o tempo total de cada variação
+A montagem do produto final será implementada em outro módulo.
+
+---
+
+## Fluxo
+
+```
+1. Cadastrar composição     → apenas id_produto + id_projeto_impressao
+2. Visualizar composição    → partes + quantidade de itens (sem cores)
+3. Configurar Parte         → selecionar cores por item
+4. Gerar variações          → preview individual por item+cor
+5. Confirmar variações      → persistir no banco
+6. Salvar filamentos        → preço congelado + custo calculado
+```
 
 ---
 
@@ -17,286 +30,187 @@ A composição é responsável por:
 
 ### `produto_composicoes`
 
-| Campo                | Tipo | Obrigatório | Regras                          |
-|----------------------|------|-------------|---------------------------------|
-| id                   | int  | —           | PK                              |
-| id_produto           | FK   | Sim         | referência `produtos_base`      |
-| id_projeto_impressao | FK   | Sim         | referência `projetos_impressao` |
-| created_at           | —    | —           | automático                      |
-| updated_at           | —    | —           | automático                      |
-| deleted_at           | —    | —           | soft delete                     |
+| Campo                | Tipo | Obrigatório |
+|----------------------|------|-------------|
+| id                   | int  | PK          |
+| id_produto           | FK   | Sim         |
+| id_projeto_impressao | FK   | Sim         |
 
-### `produto_composicao_variacoes`
+### `produto_composicao_cores`
 
-| Campo                  | Tipo    | Obrigatório | Regras                         |
-|------------------------|---------|-------------|--------------------------------|
-| id                     | int     | —           | PK                             |
-| id_produto_composicao  | FK      | Sim         | referência `produto_composicoes` |
-| id_produto_variacao    | FK      | Sim         | referência `produto_variacoes` |
-| custo_total_filamentos | decimal | Sim         | somatório dos itens            |
-| tempo_total_impressao  | string  | Sim         | formato `HH:mm`                |
-| created_at             | —       | —           | automático                     |
-| updated_at             | —       | —           | automático                     |
+Vínculo: composição → parte → item → tipo de cor → cor.
 
-### `produto_composicao_itens`
+| Campo           | Tipo   | Obrigatório |
+|-----------------|--------|-------------|
+| id              | int    | PK          |
+| id_composicao   | FK     | Sim         |
+| id_parte        | FK     | Sim         |
+| id_item_projeto | FK     | Sim         |
+| tipo_cor        | string | Sim — `PRIMARIA`, `SECUNDARIA`, `TERCIARIA` |
+| id_cor          | FK     | Sim         |
 
-| Campo                            | Tipo    | Obrigatório | Regras                                      |
-|----------------------------------|---------|-------------|---------------------------------------------|
-| id                               | int     | —           | PK                                          |
-| id_produto_composicao_variacao   | FK      | Sim         | referência `produto_composicao_variacoes`   |
-| id_item_projeto                  | FK      | Sim         | referência `projetos_impressao_parte_itens` |
-| id_filamento                     | FK      | Sim         | referência `filamentos`                     |
-| peso_total                       | decimal | Sim         | gramas                                      |
-| tempo_impressao                  | string  | Sim         | formato `HH:mm`                             |
-| preco_medio_grama                | decimal | Sim         | snapshot no momento do save                 |
-| custo_item                       | decimal | Sim         | `peso_total × preco_medio_grama`            |
-| created_at                       | —       | —           | automático                                  |
-| updated_at                       | —       | —           | automático                                  |
+Unique: `(id_composicao, id_item_projeto, tipo_cor, id_cor)`.
 
----
+### `produto_variacoes`
 
-## Regras de Negócio
+Uma variação = um item + um tipo de cor + uma cor. **Sem combinações entre itens.**
 
-- Um **Produto Base** pode possuir apenas **uma composição ativa** (não excluída).
-- Ao salvar, é obrigatório informar **todas as variações ATIVAS** do produto.
-- Cada variação deve conter **todos os itens** do projeto de impressão selecionado.
-- **Custo do item:** `peso_total × preco_medio_grama`.
-- **Custo total da variação:** somatório de `custo_item`.
-- **Tempo total da variação:** somatório dos tempos `HH:mm` dos itens.
-- O `preco_medio_grama` é **congelado no momento da composição** — não é recalculado se o preço do filamento mudar depois.
-- Na visualização (`GET /listar/{id}`), retorna os filamentos selecionados com os valores históricos salvos.
-- Na exclusão da composição, registros filhos (`variacoes` e `itens`) são removidos fisicamente.
+| Campo              | Tipo   | Obrigatório |
+|--------------------|--------|-------------|
+| id                 | int    | PK          |
+| id_composicao      | FK     | Sim         |
+| id_parte           | FK     | Sim         |
+| id_item_projeto    | FK     | Sim         |
+| tipo_cor           | string | Sim         |
+| id_cor             | FK     | Sim         |
+| id_composicao_cor  | FK     | Sim         |
 
----
+### `produto_variacao_filamentos`
 
-## Fórmulas
-
-**Custo do item:**
-
-```
-custo_item = peso_total × preco_medio_grama
-```
-
-Exemplo: `30 × 0,07 = 2,10`
-
-**Custo total da variação:**
-
-```
-custo_total_filamentos = Σ custo_item
-```
-
-**Tempo total da variação:**
-
-```
-tempo_total_impressao = Σ tempo_impressao (formato HH:mm)
-```
-
----
-
-## Arquivos Gerados
-
-| Tipo        | Caminho                                                                                      |
-|-------------|----------------------------------------------------------------------------------------------|
-| Migrations  | `database/migrations/2026_05_30_000028_create_produto_composicoes_table.php`                 |
-| Migrations  | `database/migrations/2026_05_30_000029_create_produto_composicao_variacoes_table.php`      |
-| Migrations  | `database/migrations/2026_05_30_000030_create_produto_composicao_itens_table.php`           |
-| Models      | `app/Models/ProdutoComposicao.php`                                                           |
-| Models      | `app/Models/ProdutoComposicaoVariacao.php`                                                   |
-| Models      | `app/Models/ProdutoComposicaoItem.php`                                                       |
-| Repository  | `app/Repositories/ProdutoComposicao/ProdutoComposicaoRepository.php`                         |
-| Repository  | `app/Repositories/ProdutoComposicaoVariacao/ProdutoComposicaoVariacaoRepository.php`         |
-| Repository  | `app/Repositories/ProdutoComposicaoItem/ProdutoComposicaoItemRepository.php`                 |
-| Requests    | `app/Http/Requests/ProdutoComposicao/ProdutoComposicaoCadastrarRequest.php`                  |
-| Requests    | `app/Http/Requests/ProdutoComposicao/ProdutoComposicaoEditarRequest.php`                     |
-| Controller  | `app/Http/Controllers/ProdutoComposicaoController.php`                                       |
-| Service     | `app/Services/ProdutoComposicao/ProdutoComposicaoService.php`                                |
-| Service     | `app/Services/ProdutoComposicao/ProdutoComposicaoCalculoService.php`                         |
-| Rotas       | `routes/routerFiles/composicaoProdutosRouter.php`                                            |
+| Campo             | Tipo    | Regra                          |
+|-------------------|---------|--------------------------------|
+| id_variacao       | FK      | 1 filamento por variação       |
+| id_filamento      | FK      |                                |
+| preco_medio_grama | decimal | snapshot — nunca recalculado   |
+| peso_item         | decimal | gramas                         |
+| custo_item        | decimal | peso_item × preco_medio_grama  |
 
 ---
 
 ## Rotas
 
-| Método | Endpoint                                      | Controller Method                  |
-|--------|-----------------------------------------------|------------------------------------|
-| GET    | /composicao-produtos/lookups                  | listarLookupsProdutoComposicao     |
-| GET    | /composicao-produtos/carregar-composicao      | carregarProdutoComposicao          |
-| GET    | /composicao-produtos/carregar                 | carregarProdutoComposicao (alias)  |
-| GET    | /composicao-produtos/listar                   | listarProdutoComposicao            |
-| GET    | /composicao-produtos/listar/{id}              | listarProdutoComposicaoId          |
-| POST   | /composicao-produtos/cadastrar                | createProdutoComposicao            |
-| PUT    | /composicao-produtos/editar                   | editProdutoComposicao              |
-| DELETE | /composicao-produtos/excluir/{id}             | deleteProdutoComposicao            |
-| GET    | /composicao-produtos/composicao-produtos-list | listarProdutoComposicaoAsync       |
+| Método | Endpoint | Descrição |
+|--------|----------|-----------|
+| POST   | /cadastrar | Cria composição (produto + projeto) |
+| GET    | /listar/{id} | Visualiza composição com resumo das partes |
+| GET    | /configurar-parte/{id}/{idParte} | Alias: `/{id}/parte/{idParte}/configurar` |
+| PUT    | /salvar-cores-parte | Salva cores dos itens de uma parte |
+| POST   | /gerar-variacoes/{id}?id_parte=&id_item_projeto= | Preview de variações individuais |
+| POST   | /confirmar-variacoes | Persiste variações (opcional id_parte, id_item_projeto) |
+| PUT    | /salvar-filamentos | Vincula filamentos (opcional id_parte, id_item_projeto) |
 
-> Prefixo completo: `/api/v1/composicao-produtos/...`
-
----
-
-## Carregamento — `GET /carregar-composicao`
-
-Query params obrigatórios:
-
-| Param                | Tipo | Descrição              |
-|----------------------|------|------------------------|
-| id_produto_base      | int  | ID do produto base     |
-| id_projeto_impressao | int  | ID do projeto de impressão |
-
-> Alias aceito: `id_produto` no lugar de `id_produto_base`. A rota `/carregar` também aponta para o mesmo endpoint.
-
-**Resposta (200):**
-
-```json
-{
-  "produto": {
-    "id": 1,
-    "descricao_produto": "Monocromático Ephvl",
-    "sku_base": "1000-prtjs-mncrc-ephvl",
-    "variacoes": []
-  },
-  "projeto": {
-    "id": 2,
-    "nome_original_projeto": "Projeto Tampa",
-    "codigo_projeto": "PRJ-001",
-    "partes": [
-      {
-        "id": 1,
-        "nome_parte": "Tampa",
-        "itens": [
-          {
-            "id": 10,
-            "nome_parte": "Tampa",
-            "nome_item": "Tampa",
-            "peso_total": 30,
-            "tempo_impressao": "01:30",
-            "cor": {
-              "id": 5,
-              "descricao": "BRANCO",
-              "hexadecimal": "#FFFFFF"
-            }
-          }
-        ]
-      }
-    ]
-  },
-  "filamentos": [
-    {
-      "id": 3,
-      "resumo": "PETG BRANCO PREMIUM",
-      "preco_medio_por_grama": 0.07
-    }
-  ]
-}
-```
+> Prefixo: `/api/v1/composicao-produtos/...`
 
 ---
 
 ## Cadastro — `POST /cadastrar`
 
-**Payload:**
-
 ```json
 {
   "id_produto": 1,
-  "id_projeto_impressao": 2,
-  "variacoes": [
-    {
-      "id_produto_variacao": 5,
-      "itens": [
-        {
-          "id_item_projeto": 10,
-          "id_filamento": 3,
-          "peso_total": 30,
-          "tempo_impressao": "01:30",
-          "preco_medio_grama": 0.07
-        }
-      ]
-    }
-  ]
+  "id_projeto_impressao": 2
 }
 ```
-
-**Resposta (200):**
-
-```json
-{
-  "produtoComposicao": {
-    "data": {},
-    "status": true,
-    "message": "Composição do produto cadastrada com sucesso!"
-  }
-}
-```
-
----
-
-## Edição — `PUT /editar`
-
-Mesmo payload do cadastro, incluindo `"id"` da composição.
 
 ---
 
 ## Visualização — `GET /listar/{id}`
 
-Retorna composição completa com variações, itens, filamentos selecionados e valores históricos de `preco_medio_grama` e `custo_item`.
+Retorna partes com `quantidade_itens`, flags `cores_configuradas` e `variacoes_geradas`. **Sem campos de cor.**
 
 ---
 
-## Async List — `GET /composicao-produtos-list`
+## Configurar Parte — `GET /configurar-parte/{id}/{idParte}`
 
-| Param         | Tipo   | Descrição                                              |
-|---------------|--------|--------------------------------------------------------|
-| palavra_chave | string | Busca em produto, SKU base, nome e código do projeto   |
-
-Retorna até **10** registros quando `palavra_chave` é informada.
-
-**Resposta (200):**
+Retorna a estrutura **Parte → Itens → Cores configuradas → Variações do item**:
 
 ```json
-[
-  {
-    "id": 1,
-    "descricao_produto": "Monocromático Ephvl",
-    "sku_base": "1000-prtjs-mncrc-ephvl",
-    "nome_original_projeto": "Projeto Tampa",
-    "codigo_projeto": "PRJ-001"
-  }
-]
+{
+  "parte": { "id": 2, "nome_parte": "TAMPA" },
+  "itens": [
+    {
+      "id": 10,
+      "nome_item": "Base Tampa",
+      "peso_total": 30,
+      "tempo_impressao": "01:30:00",
+      "cores": {
+        "primarias": [{ "id": 1, "id_cor": 3, "tipo_cor": "PRIMARIA", "descricao": "Rosa" }],
+        "secundarias": [],
+        "terciarias": []
+      },
+      "variacoes": []
+    }
+  ],
+  "cores_disponiveis": [],
+  "tipos_cor": ["PRIMARIA", "SECUNDARIA", "TERCIARIA"],
+  "filamentos": []
+}
 ```
 
 ---
 
-## Listagem paginada — `GET /listar`
+## Salvar Cores da Parte — `PUT /salvar-cores-parte`
 
-Filtros suportados:
+Todos os itens da parte devem ser enviados. Cores vinculadas ao **item**, não à parte.
 
-| Param                | Descrição                    |
-|----------------------|------------------------------|
-| id_produto           | Filtra por produto           |
-| id_projeto_impressao | Filtra por projeto           |
-| descricao_produto    | Like na descrição do produto |
-| sku_base             | Like no SKU base             |
-| codigo_projeto       | Like no código do projeto    |
-| palavra_chave        | Busca combinada              |
-| page                 | Página                       |
-| perPage              | Itens por página             |
+```json
+{
+  "id_composicao": 1,
+  "id_parte": 2,
+  "itens": [
+    {
+      "id_item_projeto": 10,
+      "cores_primarias": [1, 2, 3],
+      "cores_secundarias": [],
+      "cores_terciarias": []
+    },
+    {
+      "id_item_projeto": 11,
+      "cores_primarias": [5],
+      "cores_secundarias": [],
+      "cores_terciarias": []
+    }
+  ]
+}
+```
+
+Gera variações individuais (exemplo correto):
+
+- Base Tampa → Rosa
+- Base Tampa → Azul
+- Base Tampa → Lilás
+- Pegador Tampa → Branco
+
+**Não gera:** Base Rosa + Pegador Branco (combinação entre itens).
 
 ---
 
-## Erros comuns
+## Gerar Variações — `POST /gerar-variacoes/{id}?id_parte=2&id_item_projeto=10`
 
-| Status | Situação                                              |
-|--------|-------------------------------------------------------|
-| 404    | Composição, produto ou projeto não encontrado         |
-| 422    | Produto já possui composição ativa                    |
-| 422    | Variações ativas incompletas no payload               |
-| 422    | Itens do projeto incompletos em alguma variação       |
-| 422    | Filamento ou item do projeto inválido                 |
+Preview sem salvar. Query params opcionais: `id_parte`, `id_item_projeto`.
+
+Resposta agrupa por item em `itens[].variacoes` e lista plana em `variacoes`.
 
 ---
 
-## Observações
+## Confirmar Variações — `POST /confirmar-variacoes`
 
-- O endpoint `/lookups` retorna listas de produtos, projetos de impressão e filamentos para os selects do formulário.
-- O endpoint `/carregar-composicao` é específico deste módulo e complementa as 7 rotas padrão do CRUD.
-- `preco_medio_por_grama` nos lookups de filamento usa a mesma regra do módulo de filamentos (`itens.preco_medio_atual` com fallback para `filamentos.preco_medio_grama`).
+```json
+{
+  "id_composicao": 1,
+  "id_parte": 2
+}
+```
+
+`id_parte` opcional. Confirma apenas a parte informada ou toda a composição.
+
+---
+
+## Salvar Filamentos — `PUT /salvar-filamentos`
+
+```json
+{
+  "id_composicao": 1,
+  "id_parte": 2,
+  "filamentos": [
+    {
+      "id_variacao": 5,
+      "id_filamento": 3,
+      "peso_item": 30,
+      "preco_medio_grama": 0.07
+    }
+  ]
+}
+```
+
+`preco_medio_grama` é congelado no momento do cadastro.

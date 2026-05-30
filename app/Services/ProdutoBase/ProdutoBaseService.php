@@ -3,14 +3,14 @@
 namespace App\Services\ProdutoBase;
 
 use App\Models\CategoriaProduto;
-use App\Models\Cor;
 use App\Models\LinhaProduto;
 use App\Models\ModeloProduto;
-use App\Models\ParteBase;
-use App\Models\ProdutoVariacao;
 use App\Repositories\Configuracao\ConfiguracaoRepository;
 use App\Repositories\ProdutoBase\ProdutoBaseRepository;
+use App\Repositories\ProdutoComposicao\ProdutoComposicaoRepository;
+use App\Repositories\ProdutoComposicaoCor\ProdutoComposicaoCorRepository;
 use App\Repositories\ProdutoVariacao\ProdutoVariacaoRepository;
+use App\Repositories\ProdutoVariacaoFilamento\ProdutoVariacaoFilamentoRepository;
 use App\Services\PaginateService;
 use Exception;
 use Illuminate\Database\QueryException;
@@ -19,14 +19,25 @@ use Illuminate\Support\Facades\DB;
 class ProdutoBaseService
 {
     private ProdutoBaseRepository $_repository;
+
+    private ProdutoComposicaoRepository $_composicaoRepository;
+
+    private ProdutoComposicaoCorRepository $_composicaoCorRepository;
+
     private ProdutoVariacaoRepository $_variacaoRepository;
+
+    private ProdutoVariacaoFilamentoRepository $_filamentoRepository;
+
     private ConfiguracaoRepository $_configuracaoRepository;
 
     public function __construct()
     {
-        $this->_repository              = new ProdutoBaseRepository();
-        $this->_variacaoRepository      = new ProdutoVariacaoRepository();
-        $this->_configuracaoRepository  = new ConfiguracaoRepository();
+        $this->_repository               = new ProdutoBaseRepository();
+        $this->_composicaoRepository     = new ProdutoComposicaoRepository();
+        $this->_composicaoCorRepository  = new ProdutoComposicaoCorRepository();
+        $this->_variacaoRepository       = new ProdutoVariacaoRepository();
+        $this->_filamentoRepository      = new ProdutoVariacaoFilamentoRepository();
+        $this->_configuracaoRepository   = new ConfiguracaoRepository();
     }
 
     public function handleLookupsProdutoBase(): array
@@ -39,12 +50,6 @@ class ProdutoBaseService
                 ->orderBy('descricao')
                 ->get(['id', 'descricao', 'codigo']),
             'linhasProdutos' => LinhaProduto::whereNull('deleted_at')
-                ->orderBy('descricao')
-                ->get(['id', 'descricao', 'codigo']),
-            'cores' => Cor::whereNull('deleted_at')
-                ->orderBy('descricao')
-                ->get(['id', 'descricao', 'codigo']),
-            'partesBase' => ParteBase::whereNull('deleted_at')
                 ->orderBy('descricao')
                 ->get(['id', 'descricao', 'codigo']),
             'proximoCodigoBase' => $this->_configuracaoRepository->getProximoCodigoBase(),
@@ -146,8 +151,7 @@ class ProdutoBaseService
                 throw new Exception('Produto base não encontrado', 404);
             }
 
-            $skuBaseAnterior = $record->sku_base;
-            $idLinha         = $this->resolveIdLinha($atributes);
+            $idLinha = $this->resolveIdLinha($atributes);
 
             $skuBase = $this->buildSkuBase(
                 $record->codigo_base,
@@ -168,10 +172,6 @@ class ProdutoBaseService
 
             if (!$saved) {
                 throw new Exception('Não foi possível editar produto base', 500);
-            }
-
-            if ($skuBaseAnterior !== $skuBase) {
-                $this->atualizarSkusVariacoes((int) $record->id, $skuBase);
             }
 
             return (object) [
@@ -196,7 +196,7 @@ class ProdutoBaseService
             throw new Exception('Produto base não encontrado', 404);
         }
 
-        $this->_variacaoRepository->softDeleteByProdutoBaseId((int) $record->id);
+        $this->removerComposicoesPorProduto((int) $record->id);
 
         $saved = $this->_repository->delete($record);
 
@@ -236,31 +236,27 @@ class ProdutoBaseService
             throw new Exception('Produto base não encontrado', 404);
         }
 
-        $variacoes = $this->_repository->getVariacoesByProdutoBaseId((int) $record->id);
-
         return [
-            'id'                    => (int) $record->id,
-            'descricao_produto'     => $record->descricao_produto,
-            'codigo_base'           => $record->codigo_base,
-            'sku_base'              => $record->sku_base,
-            'id_categoria'          => (int) $record->id_categoria,
-            'id_modelo'             => (int) $record->id_modelo,
-            'id_linha'              => $record->id_linha !== null ? (int) $record->id_linha : null,
-            'created_at'            => $record->created_at,
-            'categoria'             => [
+            'id'                => (int) $record->id,
+            'descricao_produto' => $record->descricao_produto,
+            'codigo_base'       => $record->codigo_base,
+            'sku_base'          => $record->sku_base,
+            'id_categoria'      => (int) $record->id_categoria,
+            'id_modelo'         => (int) $record->id_modelo,
+            'id_linha'          => $record->id_linha !== null ? (int) $record->id_linha : null,
+            'created_at'        => $record->created_at,
+            'categoria'         => [
                 'descricao' => $record->categoria_descricao,
                 'codigo'    => $record->categoria_codigo,
             ],
-            'modelo'                => [
+            'modelo'            => [
                 'descricao' => $record->modelo_descricao,
                 'codigo'    => $record->modelo_codigo,
             ],
-            'linha'                 => $record->id_linha !== null ? [
+            'linha'             => $record->id_linha !== null ? [
                 'descricao' => $record->linha_descricao,
                 'codigo'    => $record->linha_codigo,
             ] : null,
-            'quantidade_variacoes'  => $variacoes->where('status', ProdutoVariacao::STATUS_ATIVA)->count(),
-            'variacoes'             => $variacoes->map(fn ($v) => $this->mapVariacaoDetalhe($v))->values()->toArray(),
         ];
     }
 
@@ -305,77 +301,22 @@ class ProdutoBaseService
         return implode('-', $partes);
     }
 
-    private function atualizarSkusVariacoes(int $idProdutoBase, string $novoSkuBase): void
+    private function removerComposicoesPorProduto(int $idProduto): void
     {
-        $variacoes = $this->_variacaoRepository->getByProdutoBaseId($idProdutoBase);
+        $composicoes = DB::table('produto_composicoes')
+            ->where('id_produto', $idProduto)
+            ->whereNull('deleted_at')
+            ->pluck('id')
+            ->map(fn ($id) => (int) $id)
+            ->toArray();
 
-        foreach ($variacoes as $variacao) {
-            if ($variacao->deleted_at !== null) {
-                continue;
-            }
-
-            $novoSku = $this->buildSkuVariacaoFromRecord($novoSkuBase, $variacao);
-            $this->validateSkuVariacaoUnico($novoSku, $variacao->id);
-            $this->_variacaoRepository->update($variacao, ['sku' => $novoSku]);
-        }
-    }
-
-    private function buildSkuVariacaoFromRecord(string $skuBase, $variacao): string
-    {
-        $codigos = $this->_variacaoRepository->getCodigosCores(
-            (int) $variacao->id_cor_primaria,
-            $variacao->id_cor_secundaria !== null ? (int) $variacao->id_cor_secundaria : null,
-            $variacao->id_cor_terciaria !== null ? (int) $variacao->id_cor_terciaria : null
-        );
-
-        if (!$codigos) {
-            throw new Exception('Não foi possível atualizar SKU das variações. Verifique as cores vinculadas.', 422);
+        foreach ($composicoes as $idComposicao) {
+            $this->_filamentoRepository->deleteByComposicaoId($idComposicao);
+            $this->_variacaoRepository->deleteByComposicaoId($idComposicao);
+            $this->_composicaoCorRepository->deleteByComposicaoId($idComposicao);
         }
 
-        return $this->montarSkuVariacao($skuBase, $codigos);
-    }
-
-    private function montarSkuVariacao(string $skuBase, object $codigos): string
-    {
-        $partes = [$skuBase, $codigos->codigo_primaria];
-
-        if ($codigos->codigo_secundaria !== null) {
-            $partes[] = $codigos->codigo_secundaria;
-        }
-
-        if ($codigos->codigo_terciaria !== null) {
-            $partes[] = $codigos->codigo_terciaria;
-        }
-
-        return implode('-', $partes);
-    }
-
-    private function mapVariacaoDetalhe(object $v): array
-    {
-        return [
-            'id'                 => (int) $v->id,
-            'sku'                => $v->sku,
-            'status'             => $v->status,
-            'id_cor_primaria'    => (int) $v->id_cor_primaria,
-            'id_cor_secundaria'  => $v->id_cor_secundaria !== null ? (int) $v->id_cor_secundaria : null,
-            'id_cor_terciaria'   => $v->id_cor_terciaria !== null ? (int) $v->id_cor_terciaria : null,
-            'cor_primaria'       => [
-                'descricao'   => $v->cor_primaria_descricao,
-                'codigo'      => $v->cor_primaria_codigo,
-                'hexadecimal' => $v->cor_primaria_hexadecimal ?? null,
-            ],
-            'cor_secundaria'     => $v->id_cor_secundaria !== null ? [
-                'descricao'   => $v->cor_secundaria_descricao,
-                'codigo'      => $v->cor_secundaria_codigo,
-                'hexadecimal' => $v->cor_secundaria_hexadecimal ?? null,
-            ] : null,
-            'cor_terciaria'      => $v->id_cor_terciaria !== null ? [
-                'descricao'   => $v->cor_terciaria_descricao,
-                'codigo'      => $v->cor_terciaria_codigo,
-                'hexadecimal' => $v->cor_terciaria_hexadecimal ?? null,
-            ] : null,
-            'created_at'         => $v->created_at,
-        ];
+        $this->_composicaoRepository->softDeleteByProdutoId($idProduto);
     }
 
     private function resolveIdLinha(object $atributes): ?int
@@ -391,13 +332,6 @@ class ProdutoBaseService
     {
         if ($this->_repository->findBySkuBase($skuBase, $excludeId)) {
             throw new Exception('Já existe um produto base com este SKU.', 422);
-        }
-    }
-
-    private function validateSkuVariacaoUnico(string $sku, int|string|null $excludeId = null): void
-    {
-        if ($this->_variacaoRepository->findBySku($sku, $excludeId)) {
-            throw new Exception('Já existe uma variação com este SKU: ' . $sku, 422);
         }
     }
 

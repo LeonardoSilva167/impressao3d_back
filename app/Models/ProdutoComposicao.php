@@ -38,8 +38,13 @@ class ProdutoComposicao extends Model
         return $this->belongsTo(ProjetoImpressao::class, 'id_projeto_impressao');
     }
 
+    public function cores()
+    {
+        return $this->hasMany(ProdutoComposicaoCor::class, 'id_composicao');
+    }
+
     public function variacoes()
     {
-        return $this->hasMany(ProdutoComposicaoVariacao::class, 'id_produto_composicao');
+        return $this->hasMany(ProdutoVariacao::class, 'id_composicao');
     }
 }

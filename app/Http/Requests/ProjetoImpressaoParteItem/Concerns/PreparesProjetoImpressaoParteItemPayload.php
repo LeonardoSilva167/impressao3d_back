@@ -4,12 +4,14 @@ namespace App\Http\Requests\ProjetoImpressaoParteItem\Concerns;
 
 use App\Services\ProjetoImpressaoParteItem\ProjetoImpressaoParteItemCalculoService;
 use App\Services\ProjetoImpressaoParteItem\ProjetoImpressaoParteItemConfig;
+use App\Services\ProjetoImpressaoParteItem\ProjetoImpressaoParteItemTempoService;
 
 trait PreparesProjetoImpressaoParteItemPayload
 {
     protected function prepareProjetoImpressaoParteItemPayload(): void
     {
         $calculoService = new ProjetoImpressaoParteItemCalculoService();
+        $tempoService   = new ProjetoImpressaoParteItemTempoService();
 
         $merge = [
             'usa_suporte'   => $this->resolverBoolean($this->input('usa_suporte'), $this->input('possui_suporte')),
@@ -35,6 +37,14 @@ trait PreparesProjetoImpressaoParteItemPayload
 
         if ($this->input('fluxo') !== null && $this->input('fluxo_engomagem') === null) {
             $merge['fluxo_engomagem'] = $this->input('fluxo');
+        }
+
+        $tempoImpressao = $this->input('tempo_impressao');
+        if ($tempoImpressao !== null) {
+            $tempoNormalizado = $tempoService->normalizar((string) $tempoImpressao);
+            if ($tempoNormalizado !== null) {
+                $merge['tempo_impressao'] = $tempoNormalizado;
+            }
         }
 
         $pesoParte = $this->input('peso_parte');

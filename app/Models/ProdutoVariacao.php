@@ -10,50 +10,68 @@ class ProdutoVariacao extends Model
 {
     use HasFactory, SoftDeletes;
 
-    public const STATUS_ATIVA = 'ATIVA';
-    public const STATUS_INATIVADA = 'INATIVADA';
+    public const TIPO_PRIMARIA = 'PRIMARIA';
+    public const TIPO_SECUNDARIA = 'SECUNDARIA';
+    public const TIPO_TERCIARIA = 'TERCIARIA';
+
+    public const TIPOS_COR = [
+        self::TIPO_PRIMARIA,
+        self::TIPO_SECUNDARIA,
+        self::TIPO_TERCIARIA,
+    ];
 
     protected $table = 'produto_variacoes';
 
     protected $fillable = [
-        'id_produto_base',
-        'id_cor_primaria',
-        'id_cor_secundaria',
-        'id_cor_terciaria',
-        'sku',
-        'status',
+        'id_composicao',
+        'id_parte',
+        'id_item_projeto',
+        'tipo_cor',
+        'id_cor',
+        'id_composicao_cor',
     ];
 
     protected $casts = [
-        'id'                => 'integer',
-        'id_produto_base'   => 'integer',
-        'id_cor_primaria'   => 'integer',
-        'id_cor_secundaria' => 'integer',
-        'id_cor_terciaria'  => 'integer',
-        'created_at'        => 'datetime',
-        'updated_at'        => 'datetime',
-        'deleted_at'        => 'datetime',
+        'id'                 => 'integer',
+        'id_composicao'      => 'integer',
+        'id_parte'           => 'integer',
+        'id_item_projeto'    => 'integer',
+        'id_cor'             => 'integer',
+        'id_composicao_cor'  => 'integer',
+        'created_at'         => 'datetime',
+        'updated_at'         => 'datetime',
+        'deleted_at'         => 'datetime',
     ];
 
     protected $dates = ['deleted_at'];
 
-    public function produtoBase()
+    public function composicao()
     {
-        return $this->belongsTo(ProdutoBase::class, 'id_produto_base');
+        return $this->belongsTo(ProdutoComposicao::class, 'id_composicao');
     }
 
-    public function corPrimaria()
+    public function parte()
     {
-        return $this->belongsTo(Cor::class, 'id_cor_primaria');
+        return $this->belongsTo(ProjetoImpressaoParte::class, 'id_parte');
     }
 
-    public function corSecundaria()
+    public function itemProjeto()
     {
-        return $this->belongsTo(Cor::class, 'id_cor_secundaria');
+        return $this->belongsTo(ProjetoImpressaoParteItem::class, 'id_item_projeto');
     }
 
-    public function corTerciaria()
+    public function cor()
     {
-        return $this->belongsTo(Cor::class, 'id_cor_terciaria');
+        return $this->belongsTo(Cor::class, 'id_cor');
+    }
+
+    public function composicaoCor()
+    {
+        return $this->belongsTo(ProdutoComposicaoCor::class, 'id_composicao_cor');
+    }
+
+    public function filamento()
+    {
+        return $this->hasOne(ProdutoVariacaoFilamento::class, 'id_variacao');
     }
 }

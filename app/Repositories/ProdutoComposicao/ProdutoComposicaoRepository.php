@@ -40,6 +40,14 @@ class ProdutoComposicaoRepository
         return (bool) $record->delete();
     }
 
+    public function softDeleteByProdutoId(int $idProduto): void
+    {
+        ProdutoComposicao::where('id_produto', $idProduto)
+            ->whereNull('deleted_at')
+            ->get()
+            ->each(fn (ProdutoComposicao $composicao) => $composicao->delete());
+    }
+
     public function getPaginateQuery(): Builder
     {
         return DB::query()
@@ -52,7 +60,7 @@ class ProdutoComposicaoRepository
                 'pb.sku_base',
                 'pi.nome_original_projeto',
                 'pi.codigo_projeto',
-                DB::raw('(SELECT COUNT(*) FROM produto_composicao_variacoes pcv WHERE pcv.id_produto_composicao = ent.id) as quantidade_variacoes'),
+                DB::raw('(SELECT COUNT(*) FROM produto_variacoes pv WHERE pv.id_composicao = ent.id AND pv.deleted_at IS NULL) as quantidade_variacoes'),
             )
             ->from('produto_composicoes as ent')
             ->join('produtos_base as pb', 'pb.id', '=', 'ent.id_produto')

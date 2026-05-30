@@ -2,13 +2,15 @@
 
 namespace App\Services\ProdutoComposicao;
 
+use App\Models\Cor;
 use App\Models\ProdutoVariacao;
 use App\Models\ProjetoImpressao;
 use App\Repositories\Filamento\FilamentoRepository;
 use App\Repositories\ProdutoBase\ProdutoBaseRepository;
 use App\Repositories\ProdutoComposicao\ProdutoComposicaoRepository;
-use App\Repositories\ProdutoComposicaoItem\ProdutoComposicaoItemRepository;
-use App\Repositories\ProdutoComposicaoVariacao\ProdutoComposicaoVariacaoRepository;
+use App\Repositories\ProdutoComposicaoCor\ProdutoComposicaoCorRepository;
+use App\Repositories\ProdutoVariacao\ProdutoVariacaoRepository;
+use App\Repositories\ProdutoVariacaoFilamento\ProdutoVariacaoFilamentoRepository;
 use App\Repositories\ProjetoImpressao\ProjetoImpressaoRepository;
 use App\Services\Filamento\FilamentoService;
 use App\Services\PaginateService;
@@ -19,43 +21,39 @@ use Illuminate\Support\Facades\DB;
 
 class ProdutoComposicaoService
 {
-    /**
-     * @var ProdutoComposicaoRepository $_repository
-     */
     private ProdutoComposicaoRepository $_repository;
 
-    private ProdutoComposicaoVariacaoRepository $_variacaoRepository;
+    private ProdutoComposicaoCorRepository $_corRepository;
 
-    private ProdutoComposicaoItemRepository $_itemRepository;
+    private ProdutoVariacaoRepository $_variacaoRepository;
+
+    private ProdutoVariacaoFilamentoRepository $_filamentoRepository;
 
     private ProdutoBaseRepository $_produtoRepository;
 
     private ProjetoImpressaoRepository $_projetoRepository;
 
-    private FilamentoRepository $_filamentoRepository;
+    private FilamentoRepository $_filamentoRepo;
 
-    private ProdutoComposicaoCalculoService $_calculoService;
-
-    private ProjetoImpressaoParteItemCalculoService $_itemCalculoService;
+    private ProdutoComposicaoVariacaoService $_variacaoService;
 
     private ProjetoImpressaoService $_projetoService;
+
+    private ProjetoImpressaoParteItemCalculoService $_itemCalculoService;
 
     public function __construct()
     {
         $this->_repository          = new ProdutoComposicaoRepository();
-        $this->_variacaoRepository  = new ProdutoComposicaoVariacaoRepository();
-        $this->_itemRepository      = new ProdutoComposicaoItemRepository();
+        $this->_corRepository       = new ProdutoComposicaoCorRepository();
+        $this->_variacaoRepository  = new ProdutoVariacaoRepository();
+        $this->_filamentoRepository = new ProdutoVariacaoFilamentoRepository();
         $this->_produtoRepository   = new ProdutoBaseRepository();
         $this->_projetoRepository   = new ProjetoImpressaoRepository();
-        $this->_filamentoRepository = new FilamentoRepository();
-        $this->_calculoService      = new ProdutoComposicaoCalculoService();
-        $this->_itemCalculoService  = new ProjetoImpressaoParteItemCalculoService();
+        $this->_filamentoRepo       = new FilamentoRepository();
+        $this->_variacaoService     = new ProdutoComposicaoVariacaoService();
         $this->_projetoService      = new ProjetoImpressaoService();
+        $this->_itemCalculoService  = new ProjetoImpressaoParteItemCalculoService();
     }
-
-    // =========================================================
-    // LOOKUPS
-    // =========================================================
 
     public function handleLookupsProdutoComposicao(): array
     {
@@ -67,13 +65,8 @@ class ProdutoComposicaoService
             'projetosImpressao' => ProjetoImpressao::whereNull('deleted_at')
                 ->orderBy('nome_original_projeto')
                 ->get(['id', 'nome_original_projeto', 'codigo_projeto']),
-            'filamentos' => $this->getFilamentosLookup(),
         ];
     }
-
-    // =========================================================
-    // HANDLE FUNCTIONS (orquestração + transação)
-    // =========================================================
 
     public function handleAddProdutoComposicao(object $atributes): object
     {
@@ -126,9 +119,139 @@ class ProdutoComposicaoService
         }
     }
 
-    // =========================================================
-    // CRUD FUNCTIONS
-    // =========================================================
+    public function handleSalvarCoresParte(object $atributes): object
+    {
+        try {
+            DB::beginTransaction();
+
+            $idComposicao = (int) $atributes->id_composicao;
+            $idParte      = (int) $atributes->id_parte;
+
+            $this->validateComposicaoExiste($idComposicao);
+            $this->validatePartePertenceComposicao($idComposicao, $idParte);
+
+            $itensProcessados = $this->processarCoresPartePayload(
+                $idComposicao,
+                $idParte,
+                $atributes->itens ?? []
+            );
+
+            $idsItensParte = array_column($itensProcessados, 'id_item_projeto');
+
+            $this->_filamentoRepository->deleteByParteId($idComposicao, $idParte);
+            $this->_variacaoRepository->deleteByParteId($idComposicao, $idParte);
+            $this->_corRepository->deleteByParteId($idComposicao, $idParte);
+
+            foreach ($itensProcessados as $item) {
+                foreach ($item['cores'] as $cor) {
+                    $this->_corRepository->create([
+                        'id_composicao'   => $idComposicao,
+                        'id_parte'        => $idParte,
+                        'id_item_projeto' => $item['id_item_projeto'],
+                        'tipo_cor'        => $cor['tipo_cor'],
+                        'id_cor'          => $cor['id_cor'],
+                    ]);
+                }
+            }
+
+            DB::commit();
+
+            return (object) [
+                'data'    => $this->carregarConfiguracaoParte($idComposicao, $idParte),
+                'status'  => true,
+                'message' => 'Cores da parte configuradas com sucesso!',
+            ];
+        } catch (Exception $e) {
+            DB::rollback();
+            throw $e;
+        }
+    }
+
+    public function handleGerarVariacoes(int $idComposicao, ?int $idParte = null, ?int $idItemProjeto = null): object
+    {
+        $this->validateComposicaoExiste($idComposicao);
+
+        if ($idParte !== null) {
+            $this->validatePartePertenceComposicao($idComposicao, $idParte);
+        }
+
+        return (object) [
+            'data'    => $this->_variacaoService->gerarVariacoesPreview($idComposicao, $idParte, $idItemProjeto),
+            'status'  => true,
+            'message' => 'Preview das variações individuais dos itens gerado com sucesso!',
+        ];
+    }
+
+    public function handleConfirmarVariacoes(int $idComposicao, ?int $idParte = null, ?int $idItemProjeto = null): object
+    {
+        try {
+            DB::beginTransaction();
+
+            $this->validateComposicaoExiste($idComposicao);
+
+            if ($idParte !== null) {
+                $this->validatePartePertenceComposicao($idComposicao, $idParte);
+            }
+
+            $result = $this->_variacaoService->confirmarVariacoes($idComposicao, $idParte, $idItemProjeto);
+
+            DB::commit();
+
+            return $result;
+        } catch (Exception $e) {
+            DB::rollback();
+            throw $e;
+        }
+    }
+
+    public function handleSalvarFilamentos(object $atributes): object
+    {
+        try {
+            DB::beginTransaction();
+
+            $idComposicao = (int) $atributes->id_composicao;
+            $idParte      = isset($atributes->id_parte) && $atributes->id_parte !== null && $atributes->id_parte !== ''
+                ? (int) $atributes->id_parte
+                : null;
+            $idItemProjeto = isset($atributes->id_item_projeto) && $atributes->id_item_projeto !== null && $atributes->id_item_projeto !== ''
+                ? (int) $atributes->id_item_projeto
+                : null;
+
+            $this->validateComposicaoExiste($idComposicao);
+
+            if ($idParte !== null) {
+                $this->validatePartePertenceComposicao($idComposicao, $idParte);
+            }
+
+            if ($idItemProjeto !== null) {
+                $this->_filamentoRepository->deleteByVariacaoIds(
+                    $this->_variacaoRepository->getByComposicaoId($idComposicao, $idParte)
+                        ->where('id_item_projeto', $idItemProjeto)
+                        ->pluck('id')
+                        ->map(fn ($id) => (int) $id)
+                        ->toArray()
+                );
+            } elseif ($idParte !== null) {
+                $this->_filamentoRepository->deleteByParteId($idComposicao, $idParte);
+            } else {
+                $this->_filamentoRepository->deleteByComposicaoId($idComposicao);
+            }
+
+            $result = $this->_variacaoService->salvarFilamentos(
+                $idComposicao,
+                $atributes->filamentos ?? [],
+                $idParte,
+                $idItemProjeto
+            );
+
+            DB::commit();
+
+            return $result;
+        } catch (Exception $e) {
+            DB::rollback();
+            throw $e;
+        }
+    }
 
     public function createProdutoComposicao(object $atributes): object
     {
@@ -136,18 +259,10 @@ class ProdutoComposicaoService
         $this->validateProdutoExiste((int) $atributes->id_produto);
         $this->validateProjetoExiste((int) $atributes->id_projeto_impressao);
 
-        $variacoesProcessadas = $this->processarVariacoesPayload(
-            (int) $atributes->id_produto,
-            (int) $atributes->id_projeto_impressao,
-            $atributes->variacoes
-        );
-
         $composicao = $this->_repository->create([
             'id_produto'           => (int) $atributes->id_produto,
             'id_projeto_impressao' => (int) $atributes->id_projeto_impressao,
         ]);
-
-        $this->persistirVariacoesEItens((int) $composicao->id, $variacoesProcessadas);
 
         return (object) [
             'data'    => $this->getProdutoComposicaoId($composicao->id),
@@ -164,18 +279,17 @@ class ProdutoComposicaoService
             throw new Exception('Composição do produto não encontrada', 404);
         }
 
-        $this->validateComposicaoUnicaPorProduto((int) $atributes->id_produto, (int) $atributes->id);
-        $this->validateProdutoExiste((int) $atributes->id_produto);
+        $projetoAlterado = (int) $record->id_projeto_impressao !== (int) $atributes->id_projeto_impressao;
+        $idProduto       = isset($atributes->id_produto)
+            ? (int) $atributes->id_produto
+            : (int) $record->id_produto;
+
+        $this->validateComposicaoUnicaPorProduto($idProduto, (int) $atributes->id);
+        $this->validateProdutoExiste($idProduto);
         $this->validateProjetoExiste((int) $atributes->id_projeto_impressao);
 
-        $variacoesProcessadas = $this->processarVariacoesPayload(
-            (int) $atributes->id_produto,
-            (int) $atributes->id_projeto_impressao,
-            $atributes->variacoes
-        );
-
         $saved = $this->_repository->update($record, [
-            'id_produto'           => (int) $atributes->id_produto,
+            'id_produto'           => $idProduto,
             'id_projeto_impressao' => (int) $atributes->id_projeto_impressao,
         ]);
 
@@ -183,8 +297,9 @@ class ProdutoComposicaoService
             throw new Exception('Não foi possível editar a composição do produto', 500);
         }
 
-        $this->removerVariacoesEItens((int) $record->id);
-        $this->persistirVariacoesEItens((int) $record->id, $variacoesProcessadas);
+        if ($projetoAlterado) {
+            $this->removerDependenciasComposicao((int) $record->id);
+        }
 
         return (object) [
             'data'    => $this->getProdutoComposicaoId($atributes->id),
@@ -201,7 +316,7 @@ class ProdutoComposicaoService
             throw new Exception('Composição do produto não encontrada', 404);
         }
 
-        $this->removerVariacoesEItens((int) $record->id);
+        $this->removerDependenciasComposicao((int) $record->id);
 
         $saved = $this->_repository->delete($record);
 
@@ -215,10 +330,6 @@ class ProdutoComposicaoService
             'message' => 'Composição do produto excluída com sucesso!',
         ];
     }
-
-    // =========================================================
-    // QUERIES
-    // =========================================================
 
     public function getProdutoComposicaoPaginate(object $atributes): array
     {
@@ -245,17 +356,7 @@ class ProdutoComposicaoService
             throw new Exception('Composição do produto não encontrada', 404);
         }
 
-        $variacoes = $this->_variacaoRepository->getByComposicaoId((int) $record->id)
-            ->map(function ($variacao) {
-                $itens = $this->_itemRepository->getByVariacaoId((int) $variacao->id)
-                    ->map(fn ($item) => $this->mapItemDetalhe($item))
-                    ->values()
-                    ->toArray();
-
-                return $this->mapVariacaoDetalhe($variacao, $itens);
-            })
-            ->values()
-            ->toArray();
+        $partes = $this->getPartesResumoComposicao((int) $record->id, (int) $record->id_projeto_impressao);
 
         return [
             'id'                   => (int) $record->id,
@@ -272,8 +373,86 @@ class ProdutoComposicaoService
                 'nome_original_projeto' => $record->nome_original_projeto,
                 'codigo_projeto'        => $record->codigo_projeto,
                 'descricao_projeto'     => $record->descricao_projeto,
+                'partes'                => $partes,
             ],
-            'variacoes'            => $variacoes,
+            'quantidade_variacoes' => $this->_variacaoRepository->countByComposicaoId((int) $record->id),
+        ];
+    }
+
+    public function carregarConfiguracaoParte(int $idComposicao, int $idParte): array
+    {
+        $record = $this->_repository->findByIdWithRelations($idComposicao);
+
+        if (!$record) {
+            throw new Exception('Composição do produto não encontrada', 404);
+        }
+
+        $this->validatePartePertenceComposicao($idComposicao, $idParte);
+
+        $parte = DB::table('projetos_impressao_partes as parte')
+            ->where('parte.id', $idParte)
+            ->where('parte.id_projeto_impressao', $record->id_projeto_impressao)
+            ->whereNull('parte.deleted_at')
+            ->first();
+
+        if (!$parte) {
+            throw new Exception('Parte do projeto não encontrada.', 404);
+        }
+
+        $coresPorItem = $this->_corRepository->getByParteId($idComposicao, $idParte)
+            ->groupBy('id_item_projeto');
+
+        $variacoesPorItem = collect($this->_variacaoService->mapVariacoesComFilamentos($idComposicao, $idParte))
+            ->groupBy('id_item_projeto');
+
+        $itens = DB::table('projetos_impressao_parte_itens as item')
+            ->select(
+                'item.id',
+                'item.nome_item',
+                'item.peso_parte',
+                'item.peso_suporte',
+                'item.peso_corado',
+                'item.peso_torre',
+                'item.tempo_impressao',
+            )
+            ->where('item.id_projeto_impressao_parte', $idParte)
+            ->whereNull('item.deleted_at')
+            ->orderBy('item.nome_item')
+            ->get()
+            ->map(function ($item) use ($coresPorItem, $variacoesPorItem) {
+                $coresItem = collect($coresPorItem->get((int) $item->id, collect()));
+
+                return [
+                    'id'              => (int) $item->id,
+                    'nome_item'       => $item->nome_item,
+                    'peso_total'      => $this->_itemCalculoService->calcularPesoTotal(
+                        (float) ($item->peso_parte ?? 0),
+                        (float) ($item->peso_suporte ?? 0),
+                        (float) ($item->peso_corado ?? 0),
+                        (float) ($item->peso_torre ?? 0),
+                    ),
+                    'tempo_impressao' => $item->tempo_impressao,
+                    'cores'           => ProdutoComposicaoCorMapper::mapCoresPorTipo($coresItem),
+                    'variacoes'       => $variacoesPorItem
+                        ->get((int) $item->id, collect())
+                        ->values()
+                        ->toArray(),
+                ];
+            })
+            ->values()
+            ->toArray();
+
+        return [
+            'parte'             => [
+                'id'         => $idParte,
+                'nome_parte' => $parte->nome_parte,
+            ],
+            'itens'             => $itens,
+            'cores_disponiveis' => Cor::whereNull('deleted_at')
+                ->orderBy('descricao')
+                ->get(['id', 'descricao', 'codigo', 'hexadecimal']),
+            'tipos_cor'         => ProdutoVariacao::TIPOS_COR,
+            'filamentos'        => $this->getFilamentosLookup(),
         ];
     }
 
@@ -306,29 +485,229 @@ class ProdutoComposicaoService
             throw new Exception('Produto base não encontrado', 404);
         }
 
-        $variacoes = $this->_produtoRepository->getVariacoesByProdutoBaseId($idProduto, true)
-            ->map(fn ($v) => $this->mapVariacaoProduto($v))
+        $partes = DB::table('projetos_impressao_partes as parte')
+            ->select(
+                'parte.id',
+                'parte.nome_parte',
+                DB::raw('(SELECT COUNT(*) FROM projetos_impressao_parte_itens item WHERE item.id_projeto_impressao_parte = parte.id AND item.deleted_at IS NULL) as quantidade_itens'),
+            )
+            ->where('parte.id_projeto_impressao', $idProjetoImpressao)
+            ->whereNull('parte.deleted_at')
+            ->orderBy('parte.nome_parte')
+            ->get()
+            ->map(fn ($parte) => [
+                'id'               => (int) $parte->id,
+                'nome_parte'       => $parte->nome_parte,
+                'quantidade_itens' => (int) $parte->quantidade_itens,
+            ])
             ->values()
             ->toArray();
 
-        $projeto = $this->_projetoService->getProjetoImpressaoId($idProjetoImpressao);
-        $projeto = $this->mapProjetoCarregamento($projeto);
-
         return [
-            'produto'    => [
+            'produto' => [
                 'id'                => (int) $produto->id,
                 'descricao_produto' => $produto->descricao_produto,
                 'sku_base'          => $produto->sku_base,
-                'variacoes'         => $variacoes,
+                'codigo_base'       => $produto->codigo_base,
             ],
-            'projeto'    => $projeto,
-            'filamentos' => $this->getFilamentosLookup(),
+            'projeto' => [
+                'id'                    => $idProjetoImpressao,
+                'partes'                => $partes,
+            ],
         ];
     }
 
-    // =========================================================
-    // HELPERS
-    // =========================================================
+    private function getPartesResumoComposicao(int $idComposicao, int $idProjeto): array
+    {
+        return DB::table('projetos_impressao_partes as parte')
+            ->select(
+                'parte.id',
+                'parte.nome_parte',
+                DB::raw('(SELECT COUNT(*) FROM projetos_impressao_parte_itens item WHERE item.id_projeto_impressao_parte = parte.id AND item.deleted_at IS NULL) as quantidade_itens'),
+            )
+            ->where('parte.id_projeto_impressao', $idProjeto)
+            ->whereNull('parte.deleted_at')
+            ->orderBy('parte.nome_parte')
+            ->get()
+            ->map(function ($parte) use ($idComposicao) {
+                $idParte = (int) $parte->id;
+
+                return [
+                    'id'                  => $idParte,
+                    'nome_parte'          => $parte->nome_parte,
+                    'quantidade_itens'    => (int) $parte->quantidade_itens,
+                    'cores_configuradas'  => $this->_corRepository->partePossuiCores($idComposicao, $idParte),
+                    'variacoes_geradas'   => $this->_variacaoRepository->partePossuiVariacoes($idComposicao, $idParte),
+                    'quantidade_variacoes' => $this->_variacaoRepository->countByComposicaoId($idComposicao, $idParte),
+                ];
+            })
+            ->values()
+            ->toArray();
+    }
+
+    private function processarCoresPartePayload(int $idComposicao, int $idParte, array $itensPayload): array
+    {
+        if (empty($itensPayload)) {
+            throw new Exception('Informe ao menos um item da parte.', 422);
+        }
+
+        $itensParte = $this->getItensParteMap($idComposicao, $idParte);
+        $processados = [];
+        $idsEnviados = [];
+
+        foreach ($itensPayload as $itemPayload) {
+            $itemPayload = (object) $itemPayload;
+            $idItem      = (int) $itemPayload->id_item_projeto;
+
+            if (!isset($itensParte[$idItem])) {
+                throw new Exception('Item informado não pertence à parte selecionada.', 422);
+            }
+
+            if (in_array($idItem, $idsEnviados, true)) {
+                throw new Exception('Item duplicado na configuração da parte.', 422);
+            }
+
+            $idsEnviados[] = $idItem;
+
+            $processados[] = [
+                'id_item_projeto' => $idItem,
+                'cores'           => $this->normalizarCoresItemPorTipo($itemPayload, $itensParte[$idItem]['nome_item']),
+            ];
+        }
+
+        sort($idsEnviados);
+        $idsParte = array_keys($itensParte);
+        sort($idsParte);
+
+        if ($idsEnviados !== $idsParte) {
+            throw new Exception('Informe cores para todos os itens da parte.', 422);
+        }
+
+        return $processados;
+    }
+
+    private function normalizarCoresItemPorTipo(object $itemPayload, string $nomeItem): array
+    {
+        $mapasTipo = [
+            ProdutoVariacao::TIPO_PRIMARIA   => ['cores_primarias', 'cores_primaria', 'cor_primaria', 'cor_primarias'],
+            ProdutoVariacao::TIPO_SECUNDARIA => ['cores_secundarias', 'cores_secundaria', 'cor_secundaria', 'cor_secundarias'],
+            ProdutoVariacao::TIPO_TERCIARIA  => ['cores_terciarias', 'cores_terciaria', 'cor_terciaria', 'cor_terciarias'],
+        ];
+
+        $processadas = [];
+        $idsUsados   = [];
+
+        foreach ($mapasTipo as $tipoCor => $campos) {
+            $lista = [];
+
+            foreach ($campos as $campo) {
+                if (!empty($itemPayload->{$campo}) && is_array($itemPayload->{$campo})) {
+                    $lista = $itemPayload->{$campo};
+                    break;
+                }
+            }
+
+            foreach ($this->normalizarListaIdsCor($lista, $nomeItem, $tipoCor) as $idCor) {
+                if (in_array($idCor, $idsUsados, true)) {
+                    throw new Exception(
+                        'Cor duplicada informada para o item "' . $nomeItem . '".',
+                        422
+                    );
+                }
+
+                $idsUsados[] = $idCor;
+                $processadas[] = [
+                    'tipo_cor' => $tipoCor,
+                    'id_cor'   => $idCor,
+                ];
+            }
+        }
+
+        if (empty($processadas) && !empty($itemPayload->cores) && is_array($itemPayload->cores)) {
+            foreach ($this->normalizarListaIdsCor($itemPayload->cores, $nomeItem, ProdutoVariacao::TIPO_PRIMARIA) as $idCor) {
+                if (in_array($idCor, $idsUsados, true)) {
+                    throw new Exception(
+                        'Cor duplicada informada para o item "' . $nomeItem . '".',
+                        422
+                    );
+                }
+
+                $idsUsados[] = $idCor;
+                $processadas[] = [
+                    'tipo_cor' => ProdutoVariacao::TIPO_PRIMARIA,
+                    'id_cor'   => $idCor,
+                ];
+            }
+        }
+
+        if (empty($processadas)) {
+            throw new Exception(
+                'O item "' . $nomeItem . '" deve possuir ao menos uma cor configurada.',
+                422
+            );
+        }
+
+        return $processadas;
+    }
+
+    private function normalizarListaIdsCor(array $coresPayload, string $nomeItem, string $tipoCor): array
+    {
+        $ids = [];
+
+        foreach ($coresPayload as $cor) {
+            $idCor = is_array($cor)
+                ? (int) ($cor['id_cor'] ?? $cor['id'] ?? 0)
+                : (int) $cor;
+
+            if ($idCor <= 0) {
+                throw new Exception(
+                    'Cor inválida informada para o item "' . $nomeItem . '" (' . strtolower($tipoCor) . ').',
+                    422
+                );
+            }
+
+            if (in_array($idCor, $ids, true)) {
+                throw new Exception(
+                    'Cor duplicada informada para o item "' . $nomeItem . '" (' . strtolower($tipoCor) . ').',
+                    422
+                );
+            }
+
+            $this->validateCorExiste($idCor);
+            $ids[] = $idCor;
+        }
+
+        return $ids;
+    }
+
+    private function getItensParteMap(int $idComposicao, int $idParte): array
+    {
+        $record = $this->_repository->findById($idComposicao);
+
+        if (!$record) {
+            throw new Exception('Composição do produto não encontrada', 404);
+        }
+
+        $itens = DB::table('projetos_impressao_parte_itens as item')
+            ->select('item.id', 'item.nome_item')
+            ->join('projetos_impressao_partes as parte', 'parte.id', '=', 'item.id_projeto_impressao_parte')
+            ->where('parte.id', $idParte)
+            ->where('parte.id_projeto_impressao', $record->id_projeto_impressao)
+            ->whereNull('item.deleted_at')
+            ->whereNull('parte.deleted_at')
+            ->orderBy('item.id')
+            ->get();
+
+        $map = [];
+
+        foreach ($itens as $item) {
+            $map[(int) $item->id] = [
+                'nome_item' => $item->nome_item,
+            ];
+        }
+
+        return $map;
+    }
 
     private function getFilamentosLookup(): array
     {
@@ -363,279 +742,37 @@ class ProdutoComposicaoService
             ->toArray();
     }
 
-    private function mapProjetoCarregamento(array $projeto): array
+    private function removerDependenciasComposicao(int $idComposicao): void
     {
-        $partes = collect($projeto['partes'] ?? [])
-            ->map(function ($parte) {
-                $itens = collect($parte['itens'] ?? [])
-                    ->map(fn ($item) => $this->mapItemProjetoCarregamento($parte['nome_parte'], $item))
-                    ->values()
-                    ->toArray();
-
-                return [
-                    'id'         => (int) $parte['id'],
-                    'nome_parte' => $parte['nome_parte'],
-                    'itens'      => $itens,
-                ];
-            })
-            ->values()
-            ->toArray();
-
-        return [
-            'id'                    => (int) $projeto['id'],
-            'nome_original_projeto' => $projeto['nome_original_projeto'],
-            'codigo_projeto'        => $projeto['codigo_projeto'],
-            'descricao_projeto'     => $projeto['descricao_projeto'] ?? null,
-            'partes'                => $partes,
-        ];
-    }
-
-    private function mapItemProjetoCarregamento(string $nomeParte, array $item): array
-    {
-        return [
-            'id'              => (int) $item['id'],
-            'nome_parte'      => $nomeParte,
-            'nome_item'       => $item['nome_item'],
-            'peso_total'      => (float) ($item['peso_total'] ?? 0),
-            'tempo_impressao' => $item['tempo_impressao'],
-            'cor'             => [
-                'id'          => (int) ($item['id_cor'] ?? 0),
-                'descricao'   => $item['cor_descricao'] ?? null,
-                'hexadecimal' => $item['cor_hexadecimal'] ?? null,
-            ],
-        ];
-    }
-
-    private function mapVariacaoProduto(object $variacao): array
-    {
-        return [
-            'id'                => (int) $variacao->id,
-            'sku'               => $variacao->sku,
-            'status'            => $variacao->status,
-            'id_cor_primaria'   => (int) $variacao->id_cor_primaria,
-            'id_cor_secundaria' => $variacao->id_cor_secundaria !== null ? (int) $variacao->id_cor_secundaria : null,
-            'id_cor_terciaria'  => $variacao->id_cor_terciaria !== null ? (int) $variacao->id_cor_terciaria : null,
-            'cor_primaria'      => [
-                'descricao'   => $variacao->cor_primaria_descricao,
-                'codigo'      => $variacao->cor_primaria_codigo,
-                'hexadecimal' => $variacao->cor_primaria_hexadecimal ?? null,
-            ],
-            'cor_secundaria'    => $variacao->id_cor_secundaria !== null ? [
-                'descricao'   => $variacao->cor_secundaria_descricao,
-                'codigo'      => $variacao->cor_secundaria_codigo,
-                'hexadecimal' => $variacao->cor_secundaria_hexadecimal ?? null,
-            ] : null,
-            'cor_terciaria'     => $variacao->id_cor_terciaria !== null ? [
-                'descricao'   => $variacao->cor_terciaria_descricao,
-                'codigo'      => $variacao->cor_terciaria_codigo,
-                'hexadecimal' => $variacao->cor_terciaria_hexadecimal ?? null,
-            ] : null,
-        ];
-    }
-
-    private function mapVariacaoDetalhe(object $variacao, array $itens): array
-    {
-        return [
-            'id'                     => (int) $variacao->id,
-            'id_produto_variacao'    => (int) $variacao->id_produto_variacao,
-            'sku'                    => $variacao->sku,
-            'status'                 => $variacao->status,
-            'custo_total_filamentos' => round((float) $variacao->custo_total_filamentos, 4),
-            'tempo_total_impressao'  => $variacao->tempo_total_impressao,
-            'cor_primaria'           => [
-                'descricao'   => $variacao->cor_primaria_descricao,
-                'codigo'      => $variacao->cor_primaria_codigo,
-                'hexadecimal' => $variacao->cor_primaria_hexadecimal ?? null,
-            ],
-            'cor_secundaria'         => $variacao->id_cor_secundaria !== null ? [
-                'descricao'   => $variacao->cor_secundaria_descricao,
-                'codigo'      => $variacao->cor_secundaria_codigo,
-                'hexadecimal' => $variacao->cor_secundaria_hexadecimal ?? null,
-            ] : null,
-            'cor_terciaria'          => $variacao->id_cor_terciaria !== null ? [
-                'descricao'   => $variacao->cor_terciaria_descricao,
-                'codigo'      => $variacao->cor_terciaria_codigo,
-                'hexadecimal' => $variacao->cor_terciaria_hexadecimal ?? null,
-            ] : null,
-            'itens'                  => $itens,
-        ];
-    }
-
-    private function mapItemDetalhe(object $item): array
-    {
-        return [
-            'id'                => (int) $item->id,
-            'id_item_projeto'   => (int) $item->id_item_projeto,
-            'id_filamento'      => (int) $item->id_filamento,
-            'nome_parte'        => $item->nome_parte,
-            'nome_item'         => $item->nome_item,
-            'peso_total'        => round((float) $item->peso_total, 2),
-            'tempo_impressao'   => $item->tempo_impressao,
-            'preco_medio_grama' => round((float) $item->preco_medio_grama, 4),
-            'custo_item'        => round((float) $item->custo_item, 4),
-            'filamento'         => [
-                'id'     => (int) $item->id_filamento,
-                'resumo' => $item->filamento_resumo,
-            ],
-            'cor'               => [
-                'descricao'   => $item->cor_descricao,
-                'hexadecimal' => $item->cor_hexadecimal ?? null,
-            ],
-        ];
-    }
-
-    private function processarVariacoesPayload(int $idProduto, int $idProjeto, array $variacoesPayload): array
-    {
-        $variacoesAtivas = $this->_produtoRepository
-            ->getVariacoesByProdutoBaseId($idProduto, true)
-            ->pluck('id')
-            ->map(fn ($id) => (int) $id)
-            ->sort()
-            ->values()
-            ->toArray();
-
-        $idsEnviados = collect($variacoesPayload)
-            ->pluck('id_produto_variacao')
-            ->map(fn ($id) => (int) $id)
-            ->sort()
-            ->values()
-            ->toArray();
-
-        if ($variacoesAtivas !== $idsEnviados) {
-            throw new Exception('É necessário informar todas as variações ativas do produto.', 422);
-        }
-
-        $idsItensProjeto = $this->getIdsItensProjeto($idProjeto);
-        $processadas     = [];
-
-        foreach ($variacoesPayload as $variacaoPayload) {
-            $variacaoPayload = (object) $variacaoPayload;
-            $idVariacao      = (int) $variacaoPayload->id_produto_variacao;
-
-            $this->validateVariacaoPertenceProduto($idProduto, $idVariacao);
-
-            if (empty($variacaoPayload->itens) || !is_array($variacaoPayload->itens)) {
-                throw new Exception('Cada variação deve possuir ao menos um item.', 422);
-            }
-
-            $itensProcessados = [];
-            $idsItensEnviados = [];
-
-            foreach ($variacaoPayload->itens as $itemPayload) {
-                $itemPayload = (object) $itemPayload;
-                $idItem      = (int) $itemPayload->id_item_projeto;
-
-                if (!in_array($idItem, $idsItensProjeto, true)) {
-                    throw new Exception('Item do projeto informado não pertence ao projeto selecionado.', 422);
-                }
-
-                if (in_array($idItem, $idsItensEnviados, true)) {
-                    throw new Exception('Item do projeto duplicado na variação.', 422);
-                }
-
-                $idsItensEnviados[] = $idItem;
-
-                $filamento = $this->_filamentoRepository->findByIdWithRelations((int) $itemPayload->id_filamento);
-
-                if (!$filamento) {
-                    throw new Exception('Filamento informado não encontrado.', 422);
-                }
-
-                $pesoTotal = $this->_itemCalculoService->normalizarPeso(
-                    $itemPayload->peso_total ?? null,
-                    'O peso total',
-                    true
-                );
-
-                $tempoImpressao = (string) $itemPayload->tempo_impressao;
-
-                $precoMedioGrama = isset($itemPayload->preco_medio_grama)
-                    ? round((float) $itemPayload->preco_medio_grama, 4)
-                    : FilamentoService::resolverPrecoMedioPorGrama(
-                        isset($filamento->preco_medio_grama) ? (float) $filamento->preco_medio_grama : null,
-                        isset($filamento->item_preco_medio_atual) ? (float) $filamento->item_preco_medio_atual : null,
-                        !empty($filamento->id_item) ? (int) $filamento->id_item : null,
-                    );
-
-                $custoItem = $this->_calculoService->calcularCustoItem($pesoTotal, $precoMedioGrama);
-
-                $itensProcessados[] = [
-                    'id_item_projeto'   => $idItem,
-                    'id_filamento'      => (int) $itemPayload->id_filamento,
-                    'peso_total'        => $pesoTotal,
-                    'tempo_impressao'   => $tempoImpressao,
-                    'preco_medio_grama' => $precoMedioGrama,
-                    'custo_item'        => $custoItem,
-                ];
-            }
-
-            sort($idsItensEnviados);
-
-            if ($idsItensEnviados !== $idsItensProjeto) {
-                throw new Exception('Cada variação deve possuir todos os itens do projeto de impressão.', 422);
-            }
-
-            $custosItens = array_column($itensProcessados, 'custo_item');
-            $temposItens = array_column($itensProcessados, 'tempo_impressao');
-
-            $processadas[] = [
-                'id_produto_variacao'    => $idVariacao,
-                'custo_total_filamentos' => $this->_calculoService->calcularCustoTotal($custosItens),
-                'tempo_total_impressao'  => $this->_calculoService->somarTempos($temposItens),
-                'itens'                  => $itensProcessados,
-            ];
-        }
-
-        return $processadas;
-    }
-
-    private function persistirVariacoesEItens(int $idComposicao, array $variacoesProcessadas): void
-    {
-        foreach ($variacoesProcessadas as $variacao) {
-            $variacaoSalva = $this->_variacaoRepository->create([
-                'id_produto_composicao'  => $idComposicao,
-                'id_produto_variacao'    => $variacao['id_produto_variacao'],
-                'custo_total_filamentos' => $variacao['custo_total_filamentos'],
-                'tempo_total_impressao'  => $variacao['tempo_total_impressao'],
-            ]);
-
-            foreach ($variacao['itens'] as $item) {
-                $this->_itemRepository->create([
-                    'id_produto_composicao_variacao' => (int) $variacaoSalva->id,
-                    'id_item_projeto'                => $item['id_item_projeto'],
-                    'id_filamento'                   => $item['id_filamento'],
-                    'peso_total'                     => $item['peso_total'],
-                    'tempo_impressao'                => $item['tempo_impressao'],
-                    'preco_medio_grama'              => $item['preco_medio_grama'],
-                    'custo_item'                     => $item['custo_item'],
-                ]);
-            }
-        }
-    }
-
-    private function removerVariacoesEItens(int $idComposicao): void
-    {
-        $idsVariacao = DB::table('produto_composicao_variacoes')
-            ->where('id_produto_composicao', $idComposicao)
-            ->pluck('id')
-            ->map(fn ($id) => (int) $id)
-            ->toArray();
-
-        $this->_itemRepository->deleteByVariacaoIds($idsVariacao);
+        $this->_filamentoRepository->deleteByComposicaoId($idComposicao);
         $this->_variacaoRepository->deleteByComposicaoId($idComposicao);
+        $this->_corRepository->deleteByComposicaoId($idComposicao);
     }
 
-    private function getIdsItensProjeto(int $idProjeto): array
+    private function validateComposicaoExiste(int $idComposicao): void
     {
-        return DB::table('projetos_impressao_parte_itens as item')
-            ->join('projetos_impressao_partes as parte', 'parte.id', '=', 'item.id_projeto_impressao_parte')
-            ->whereNull('item.deleted_at')
-            ->whereNull('parte.deleted_at')
-            ->where('parte.id_projeto_impressao', $idProjeto)
-            ->orderBy('item.id')
-            ->pluck('item.id')
-            ->map(fn ($id) => (int) $id)
-            ->toArray();
+        if (!$this->_repository->findById($idComposicao)) {
+            throw new Exception('Composição do produto não encontrada', 404);
+        }
+    }
+
+    private function validatePartePertenceComposicao(int $idComposicao, int $idParte): void
+    {
+        $record = $this->_repository->findById($idComposicao);
+
+        if (!$record) {
+            throw new Exception('Composição do produto não encontrada', 404);
+        }
+
+        $existe = DB::table('projetos_impressao_partes')
+            ->where('id', $idParte)
+            ->where('id_projeto_impressao', $record->id_projeto_impressao)
+            ->whereNull('deleted_at')
+            ->exists();
+
+        if (!$existe) {
+            throw new Exception('A parte informada não pertence ao projeto desta composição.', 422);
+        }
     }
 
     private function validateComposicaoUnicaPorProduto(int $idProduto, int|string|null $excludeId = null): void
@@ -659,19 +796,10 @@ class ProdutoComposicaoService
         }
     }
 
-    private function validateVariacaoPertenceProduto(int $idProduto, int $idVariacao): void
+    private function validateCorExiste(int $idCor): void
     {
-        $variacao = DB::table('produto_variacoes')
-            ->where('id', $idVariacao)
-            ->whereNull('deleted_at')
-            ->first();
-
-        if (!$variacao || (int) $variacao->id_produto_base !== $idProduto) {
-            throw new Exception('Variação informada não pertence ao produto selecionado.', 422);
-        }
-
-        if ($variacao->status !== ProdutoVariacao::STATUS_ATIVA) {
-            throw new Exception('Apenas variações ativas podem compor o produto.', 422);
+        if (!Cor::where('id', $idCor)->whereNull('deleted_at')->exists()) {
+            throw new Exception('Cor informada não existe.', 422);
         }
     }
 

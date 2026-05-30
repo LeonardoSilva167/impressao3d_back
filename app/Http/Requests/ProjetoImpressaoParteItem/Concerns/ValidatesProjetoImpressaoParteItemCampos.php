@@ -3,6 +3,7 @@
 namespace App\Http\Requests\ProjetoImpressaoParteItem\Concerns;
 
 use App\Services\ProjetoImpressaoParteItem\ProjetoImpressaoParteItemConfig;
+use App\Services\ProjetoImpressaoParteItem\ProjetoImpressaoParteItemTempoService;
 use Illuminate\Validation\Rule;
 
 trait ValidatesProjetoImpressaoParteItemCampos
@@ -17,7 +18,7 @@ trait ValidatesProjetoImpressaoParteItemCampos
             'temperatura_bico'           => ['required', 'integer', 'min:0'],
             'temperatura_mesa'           => ['required', 'integer', 'min:0'],
             'loops_parede'               => ['required', 'integer', 'min:1'],
-            'tempo_impressao'            => ['required', 'string', 'regex:/^\d{2}:\d{2}$/'],
+            'tempo_impressao'            => ['required', 'string', 'regex:' . ProjetoImpressaoParteItemTempoService::FORMATO_REGEX],
             'peso_parte'                 => ['required', 'numeric', 'gt:0'],
             'peso_suporte'               => ['nullable', 'numeric', 'min:0'],
             'peso_corado'                => ['nullable', 'numeric', 'min:0'],
@@ -47,7 +48,7 @@ trait ValidatesProjetoImpressaoParteItemCampos
             'temperatura_mesa.required'           => 'A temperatura da mesa é obrigatória.',
             'loops_parede.required'               => 'A quantidade de loops de parede é obrigatória.',
             'tempo_impressao.required'            => 'O tempo de impressão é obrigatório.',
-            'tempo_impressao.regex'               => 'O tempo de impressão deve estar no formato HH:mm.',
+            'tempo_impressao.regex'               => 'O tempo de impressão deve estar no formato H:mm ou HH:mm.',
             'peso_parte.required'                 => 'O peso da parte é obrigatório.',
             'peso_parte.gt'                       => 'O peso da parte deve ser maior que zero.',
             'usa_suporte.required'                => 'Informe se possui suporte.',
@@ -69,7 +70,7 @@ trait ValidatesProjetoImpressaoParteItemCampos
         $validator->after(function ($validator) {
             $tempoImpressao = $this->input('tempo_impressao');
 
-            if ($tempoImpressao !== null && preg_match('/^\d{2}:\d{2}$/', (string) $tempoImpressao)) {
+            if ($tempoImpressao !== null && preg_match(ProjetoImpressaoParteItemTempoService::FORMATO_REGEX, (string) $tempoImpressao)) {
                 [$horas, $minutos] = array_map('intval', explode(':', (string) $tempoImpressao));
 
                 if ($minutos > 59) {

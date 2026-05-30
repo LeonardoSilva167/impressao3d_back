@@ -3,9 +3,7 @@
 namespace App\Repositories\ProdutoBase;
 
 use App\Models\ProdutoBase;
-use App\Models\ProdutoVariacao;
 use Illuminate\Database\Query\Builder;
-use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
 class ProdutoBaseRepository
@@ -97,7 +95,6 @@ class ProdutoBaseRepository
                 'mp.codigo as modelo_codigo',
                 'lp.descricao as linha_descricao',
                 'lp.codigo as linha_codigo',
-                DB::raw('(SELECT COUNT(*) FROM produto_variacoes pv WHERE pv.id_produto_base = ent.id AND pv.deleted_at IS NULL AND pv.status = \'ATIVA\') as quantidade_variacoes'),
             )
             ->from('produtos_base as ent')
             ->join('categorias_produtos as cp', 'cp.id', '=', 'ent.id_categoria')
@@ -144,51 +141,6 @@ class ProdutoBaseRepository
             })
             ->where('ent.id', $id)
             ->first();
-    }
-
-    public function getVariacoesByProdutoBaseId(int $idProdutoBase, bool $apenasAtivas = false): Collection
-    {
-        $query = DB::table('produto_variacoes as pv')
-            ->select(
-                'pv.id',
-                'pv.id_produto_base',
-                'pv.id_cor_primaria',
-                'pv.id_cor_secundaria',
-                'pv.id_cor_terciaria',
-                'pv.sku',
-                'pv.status',
-                'pv.created_at',
-                'cp.descricao as cor_primaria_descricao',
-                'cp.codigo as cor_primaria_codigo',
-                'cp.hexadecimal as cor_primaria_hexadecimal',
-                'cs.descricao as cor_secundaria_descricao',
-                'cs.codigo as cor_secundaria_codigo',
-                'cs.hexadecimal as cor_secundaria_hexadecimal',
-                'ct.descricao as cor_terciaria_descricao',
-                'ct.codigo as cor_terciaria_codigo',
-                'ct.hexadecimal as cor_terciaria_hexadecimal',
-            )
-            ->join('cores as cp', 'cp.id', '=', 'pv.id_cor_primaria')
-            ->leftJoin('cores as cs', 'cs.id', '=', 'pv.id_cor_secundaria')
-            ->leftJoin('cores as ct', 'ct.id', '=', 'pv.id_cor_terciaria')
-            ->whereNull('pv.deleted_at')
-            ->whereNull('cp.deleted_at')
-            ->where('pv.id_produto_base', $idProdutoBase)
-            ->where(function ($q) {
-                $q->whereNull('pv.id_cor_secundaria')
-                    ->orWhereNull('cs.deleted_at');
-            })
-            ->where(function ($q) {
-                $q->whereNull('pv.id_cor_terciaria')
-                    ->orWhereNull('ct.deleted_at');
-            })
-            ->orderBy('pv.sku');
-
-        if ($apenasAtivas) {
-            $query->where('pv.status', ProdutoVariacao::STATUS_ATIVA);
-        }
-
-        return $query->get();
     }
 
     public function getAsyncQuery(): Builder

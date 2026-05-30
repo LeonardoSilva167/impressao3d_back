@@ -48,8 +48,8 @@ class ProdutoBase extends Model
         return $this->belongsTo(LinhaProduto::class, 'id_linha');
     }
 
-    public function variacoes()
+    public function composicoes()
     {
-        return $this->hasMany(ProdutoVariacao::class, 'id_produto_base');
+        return $this->hasMany(ProdutoComposicao::class, 'id_produto');
     }
 }

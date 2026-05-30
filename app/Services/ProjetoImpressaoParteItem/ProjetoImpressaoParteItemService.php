@@ -332,7 +332,8 @@ class ProjetoImpressaoParteItemService
             'temperatura_bico'           => (int) ($atributes->temperatura_bico ?? ProjetoImpressaoParteItemConfig::TEMPERATURA_BICO_PADRAO),
             'temperatura_mesa'           => (int) ($atributes->temperatura_mesa ?? ProjetoImpressaoParteItemConfig::TEMPERATURA_MESA_PADRAO),
             'loops_parede'               => (int) ($atributes->loops_parede ?? 2),
-            'tempo_impressao'            => (string) $atributes->tempo_impressao,
+            'tempo_impressao'            => $this->_tempoService->normalizar((string) $atributes->tempo_impressao)
+                ?? (string) $atributes->tempo_impressao,
             'peso_parte'                 => $pesoParte,
             'peso_suporte'               => $pesoSuporte,
             'peso_corado'                => $pesoCorado,

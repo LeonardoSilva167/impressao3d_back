@@ -35,7 +35,6 @@ Route::prefix('v1')->group(function () {
     Route::prefix('linhas-produtos')->group(function () {require __DIR__ . '/routerFiles/linhasProdutosRouter.php';});// Rota de Linhas de Produtos
     Route::prefix('partes-base-produtos')->group(function () {require __DIR__ . '/routerFiles/partesBaseProdutosRouter.php';});// Rota de Partes Base de Produtos
     Route::prefix('produtos')->group(function () {require __DIR__ . '/routerFiles/produtosRouter.php';});// Rota de Produtos Base
-    Route::prefix('produto-variacoes')->group(function () {require __DIR__ . '/routerFiles/produtoVariacoesRouter.php';});// Rota de Variações de Produto
     Route::prefix('composicao-produtos')->group(function () {require __DIR__ . '/routerFiles/composicaoProdutosRouter.php';});// Rota de Composição de Produtos
 // routes/api.php
     

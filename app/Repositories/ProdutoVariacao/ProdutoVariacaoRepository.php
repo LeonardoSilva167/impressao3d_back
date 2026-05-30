@@ -3,219 +3,128 @@
 namespace App\Repositories\ProdutoVariacao;
 
 use App\Models\ProdutoVariacao;
-use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
 class ProdutoVariacaoRepository
 {
-    public function findById(int|string $id): ?ProdutoVariacao
-    {
-        return ProdutoVariacao::where('id', $id)->whereNull('deleted_at')->first();
-    }
-
-    public function findBySku(string $sku, int|string|null $excludeId = null): ?ProdutoVariacao
-    {
-        $query = ProdutoVariacao::where('sku', $sku)->whereNull('deleted_at');
-
-        if ($excludeId !== null) {
-            $query->where('id', '!=', $excludeId);
-        }
-
-        return $query->first();
-    }
-
-    public function findByCombinacao(
-        int $idProdutoBase,
-        int $idCorPrimaria,
-        ?int $idCorSecundaria,
-        ?int $idCorTerciaria,
-        bool $incluirDeletadas = false
-    ): ?ProdutoVariacao {
-        $query = ProdutoVariacao::where('id_produto_base', $idProdutoBase)
-            ->where('id_cor_primaria', $idCorPrimaria);
-
-        if ($idCorSecundaria === null) {
-            $query->whereNull('id_cor_secundaria');
-        } else {
-            $query->where('id_cor_secundaria', $idCorSecundaria);
-        }
-
-        if ($idCorTerciaria === null) {
-            $query->whereNull('id_cor_terciaria');
-        } else {
-            $query->where('id_cor_terciaria', $idCorTerciaria);
-        }
-
-        if (!$incluirDeletadas) {
-            $query->whereNull('deleted_at');
-        }
-
-        return $query->first();
-    }
-
     public function create(array $data): ProdutoVariacao
     {
         return ProdutoVariacao::create($data);
     }
 
-    public function update(ProdutoVariacao $record, array $data): bool
+    public function findById(int|string $id): ?ProdutoVariacao
     {
-        return $record->update($data);
+        return ProdutoVariacao::where('id', $id)->whereNull('deleted_at')->first();
     }
 
-    public function delete(ProdutoVariacao $record): bool
+    public function deleteByComposicaoId(int $idComposicao): void
     {
-        return (bool) $record->delete();
-    }
-
-    public function getCodigosCores(?int $idPrimaria, ?int $idSecundaria, ?int $idTerciaria): ?object
-    {
-        if ($idPrimaria === null) {
-            return null;
-        }
-
-        $codigoPrimaria = $this->getCodigoCor($idPrimaria);
-
-        if ($codigoPrimaria === null) {
-            return null;
-        }
-
-        $codigoSecundaria = $idSecundaria !== null ? $this->getCodigoCor($idSecundaria) : null;
-        $codigoTerciaria  = $idTerciaria !== null ? $this->getCodigoCor($idTerciaria) : null;
-
-        if ($idSecundaria !== null && $codigoSecundaria === null) {
-            return null;
-        }
-
-        if ($idTerciaria !== null && $codigoTerciaria === null) {
-            return null;
-        }
-
-        return (object) [
-            'codigo_primaria'   => $codigoPrimaria,
-            'codigo_secundaria' => $codigoSecundaria,
-            'codigo_terciaria'  => $codigoTerciaria,
-        ];
-    }
-
-    public function getByProdutoBaseId(int $idProdutoBase, bool $incluirDeletadas = false): Collection
-    {
-        $query = ProdutoVariacao::where('id_produto_base', $idProdutoBase);
-
-        if (!$incluirDeletadas) {
-            $query->whereNull('deleted_at');
-        }
-
-        return $query->get();
-    }
-
-    public function softDeleteByProdutoBaseId(int $idProdutoBase): void
-    {
-        ProdutoVariacao::where('id_produto_base', $idProdutoBase)
+        ProdutoVariacao::where('id_composicao', $idComposicao)
             ->whereNull('deleted_at')
             ->get()
             ->each(fn (ProdutoVariacao $variacao) => $variacao->delete());
     }
 
-    public function getPaginateQuery(): Builder
+    public function deleteByParteId(int $idComposicao, int $idParte): void
     {
-        return DB::query()
-            ->select(
-                'pv.id',
-                'pv.id_produto_base',
-                'pv.id_cor_primaria',
-                'pv.id_cor_secundaria',
-                'pv.id_cor_terciaria',
-                'pv.sku',
-                'pv.status',
-                'pv.created_at',
-                'pb.descricao_produto',
-                'pb.sku_base',
-                'cp.descricao as cor_primaria_descricao',
-                'cp.codigo as cor_primaria_codigo',
-                'cs.descricao as cor_secundaria_descricao',
-                'cs.codigo as cor_secundaria_codigo',
-                'ct.descricao as cor_terciaria_descricao',
-                'ct.codigo as cor_terciaria_codigo',
-            )
-            ->from('produto_variacoes as pv')
-            ->join('produtos_base as pb', 'pb.id', '=', 'pv.id_produto_base')
-            ->join('cores as cp', 'cp.id', '=', 'pv.id_cor_primaria')
-            ->leftJoin('cores as cs', 'cs.id', '=', 'pv.id_cor_secundaria')
-            ->leftJoin('cores as ct', 'ct.id', '=', 'pv.id_cor_terciaria')
-            ->whereNull('pv.deleted_at')
-            ->whereNull('pb.deleted_at')
-            ->whereNull('cp.deleted_at')
-            ->where('pv.status', ProdutoVariacao::STATUS_ATIVA)
-            ->where(function ($q) {
-                $q->whereNull('pv.id_cor_secundaria')
-                    ->orWhereNull('cs.deleted_at');
-            })
-            ->where(function ($q) {
-                $q->whereNull('pv.id_cor_terciaria')
-                    ->orWhereNull('ct.deleted_at');
-            })
-            ->orderBy('pv.sku');
-    }
-
-    public function findByIdWithRelations(int|string $id): ?object
-    {
-        return DB::table('produto_variacoes as pv')
-            ->select(
-                'pv.id',
-                'pv.id_produto_base',
-                'pv.id_cor_primaria',
-                'pv.id_cor_secundaria',
-                'pv.id_cor_terciaria',
-                'pv.sku',
-                'pv.status',
-                'pv.created_at',
-                'pb.descricao_produto',
-                'pb.sku_base',
-                'cp.descricao as cor_primaria_descricao',
-                'cp.codigo as cor_primaria_codigo',
-                'cp.hexadecimal as cor_primaria_hexadecimal',
-                'cs.descricao as cor_secundaria_descricao',
-                'cs.codigo as cor_secundaria_codigo',
-                'cs.hexadecimal as cor_secundaria_hexadecimal',
-                'ct.descricao as cor_terciaria_descricao',
-                'ct.codigo as cor_terciaria_codigo',
-                'ct.hexadecimal as cor_terciaria_hexadecimal',
-            )
-            ->join('produtos_base as pb', 'pb.id', '=', 'pv.id_produto_base')
-            ->join('cores as cp', 'cp.id', '=', 'pv.id_cor_primaria')
-            ->leftJoin('cores as cs', 'cs.id', '=', 'pv.id_cor_secundaria')
-            ->leftJoin('cores as ct', 'ct.id', '=', 'pv.id_cor_terciaria')
-            ->whereNull('pv.deleted_at')
-            ->whereNull('pb.deleted_at')
-            ->whereNull('cp.deleted_at')
-            ->where(function ($q) {
-                $q->whereNull('pv.id_cor_secundaria')
-                    ->orWhereNull('cs.deleted_at');
-            })
-            ->where(function ($q) {
-                $q->whereNull('pv.id_cor_terciaria')
-                    ->orWhereNull('ct.deleted_at');
-            })
-            ->where('pv.id', $id)
-            ->first();
-    }
-
-    public function getAsyncQuery(): Builder
-    {
-        return DB::table('produto_variacoes as pv')
-            ->whereNull('pv.deleted_at')
-            ->where('pv.status', ProdutoVariacao::STATUS_ATIVA)
-            ->select('pv.id', 'pv.sku')
-            ->orderBy('pv.sku');
-    }
-
-    private function getCodigoCor(int $idCor): ?string
-    {
-        return DB::table('cores')
-            ->where('id', $idCor)
+        ProdutoVariacao::where('id_composicao', $idComposicao)
+            ->where('id_parte', $idParte)
             ->whereNull('deleted_at')
-            ->value('codigo');
+            ->get()
+            ->each(fn (ProdutoVariacao $variacao) => $variacao->delete());
+    }
+
+    public function softDeleteByProdutoId(int $idProduto): void
+    {
+        $idsComposicao = DB::table('produto_composicoes')
+            ->where('id_produto', $idProduto)
+            ->whereNull('deleted_at')
+            ->pluck('id')
+            ->map(fn ($id) => (int) $id)
+            ->toArray();
+
+        if (empty($idsComposicao)) {
+            return;
+        }
+
+        ProdutoVariacao::whereIn('id_composicao', $idsComposicao)
+            ->whereNull('deleted_at')
+            ->get()
+            ->each(fn (ProdutoVariacao $variacao) => $variacao->delete());
+    }
+
+    public function getByComposicaoId(int $idComposicao, ?int $idParte = null): Collection
+    {
+        $query = DB::table('produto_variacoes as pv')
+            ->select(
+                'pv.id',
+                'pv.id_composicao',
+                'pv.id_parte',
+                'pv.id_item_projeto',
+                'pv.tipo_cor',
+                'pv.id_cor',
+                'pv.id_composicao_cor',
+                'pv.created_at',
+                'pv.updated_at',
+                'parte.nome_parte',
+                'item.nome_item',
+                'cor.descricao as cor_descricao',
+                'cor.codigo as cor_codigo',
+                'cor.hexadecimal as cor_hexadecimal',
+                'pvf.id as id_filamento_vinculo',
+                'pvf.id_filamento',
+                'pvf.preco_medio_grama',
+                'pvf.peso_item',
+                'pvf.custo_item',
+                'fil.resumo as filamento_resumo',
+            )
+            ->join('projetos_impressao_parte_itens as item', 'item.id', '=', 'pv.id_item_projeto')
+            ->join('projetos_impressao_partes as parte', 'parte.id', '=', 'pv.id_parte')
+            ->join('cores as cor', 'cor.id', '=', 'pv.id_cor')
+            ->leftJoin('produto_variacao_filamentos as pvf', function ($join) {
+                $join->on('pvf.id_variacao', '=', 'pv.id')
+                    ->whereNull('pvf.deleted_at');
+            })
+            ->leftJoin('filamentos as fil', function ($join) {
+                $join->on('fil.id', '=', 'pvf.id_filamento')
+                    ->whereNull('fil.deleted_at');
+            })
+            ->where('pv.id_composicao', $idComposicao)
+            ->whereNull('pv.deleted_at')
+            ->whereNull('item.deleted_at')
+            ->whereNull('parte.deleted_at')
+            ->whereNull('cor.deleted_at');
+
+        if ($idParte !== null) {
+            $query->where('pv.id_parte', $idParte);
+        }
+
+        return $query
+            ->orderBy('parte.nome_parte')
+            ->orderBy('item.nome_item')
+            ->orderBy('pv.tipo_cor')
+            ->orderBy('cor.descricao')
+            ->get();
+    }
+
+    public function countByComposicaoId(int $idComposicao, ?int $idParte = null): int
+    {
+        $query = ProdutoVariacao::where('id_composicao', $idComposicao)
+            ->whereNull('deleted_at');
+
+        if ($idParte !== null) {
+            $query->where('id_parte', $idParte);
+        }
+
+        return $query->count();
+    }
+
+    public function partePossuiVariacoes(int $idComposicao, int $idParte): bool
+    {
+        return ProdutoVariacao::where('id_composicao', $idComposicao)
+            ->where('id_parte', $idParte)
+            ->whereNull('deleted_at')
+            ->exists();
     }
 }
