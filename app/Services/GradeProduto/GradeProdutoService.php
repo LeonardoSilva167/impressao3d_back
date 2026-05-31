@@ -12,6 +12,7 @@ use App\Repositories\ProdutoComposicao\ProdutoComposicaoRepository;
 use App\Repositories\ProdutoVariacao\ProdutoVariacaoRepository;
 use App\Services\PaginateService;
 use App\Services\ProdutoComposicao\ProdutoComposicaoVariacaoService;
+use App\Services\ProjetoImpressao\ProjetoImpressaoCustoService;
 use App\Services\ProjetoImpressaoParteItem\ProjetoImpressaoParteItemCalculoService;
 use Exception;
 use Illuminate\Support\Facades\DB;
@@ -38,6 +39,8 @@ class GradeProdutoService
 
     private ProjetoImpressaoParteItemCalculoService $_itemCalculoService;
 
+    private ProjetoImpressaoCustoService $_custoService;
+
     public function __construct()
     {
         $this->_repository                 = new GradeProdutoRepository();
@@ -50,6 +53,7 @@ class GradeProdutoService
         $this->_geracaoService             = new GradeProdutoGeracaoService();
         $this->_variacaoService            = new ProdutoComposicaoVariacaoService();
         $this->_itemCalculoService         = new ProjetoImpressaoParteItemCalculoService();
+        $this->_custoService               = new ProjetoImpressaoCustoService();
     }
 
     public function handleLookupsGradeProduto(): array
@@ -417,7 +421,9 @@ class GradeProdutoService
                 'nome_parte'       => $parte->nome_parte,
             ])->values()->toArray(),
             'combinacoes'             => $combinacoes,
-            'produtos_gerados'        => $this->_itemRepository->getByGradeId($idGrade)->toArray(),
+            'produtos_gerados'        => $this->_itemRepository->getByGradeId($idGrade)
+                ->map(fn ($row) => $this->formatarListagemProduto((array) $row))
+                ->toArray(),
             'quantidade_combinacoes'  => count($combinacoes),
             'quantidade_produtos'     => $this->_itemRepository->countByGradeId($idGrade),
         ];
@@ -970,9 +976,6 @@ class GradeProdutoService
                 'peso_total'       => $produto['peso_total'],
                 'tempo_total'      => $produto['tempo_total'],
                 'custo_filamento'  => $produto['custo_filamento'],
-                'custo_energia'    => $produto['custo_energia'],
-                'custo_desgaste'   => $produto['custo_desgaste'],
-                'custo_total'      => $produto['custo_total'],
                 'status'           => true,
             ]);
         }
@@ -1093,6 +1096,11 @@ class GradeProdutoService
 
     private function formatarListagemProduto(array $row): array
     {
+        $custos = $this->_custoService->calcularCustosExibicaoGradeProduto(
+            (float) ($row['custo_filamento'] ?? 0),
+            (string) ($row['tempo_total'] ?? '00:00'),
+        );
+
         return [
             'id'                            => (int) ($row['id'] ?? 0),
             'sku'                           => $row['sku'] ?? '',
@@ -1105,10 +1113,10 @@ class GradeProdutoService
                 : null,
             'peso_total'                    => (float) ($row['peso_total'] ?? 0),
             'tempo_total'                   => $row['tempo_total'] ?? '00:00',
-            'custo_filamento'               => (float) ($row['custo_filamento'] ?? 0),
-            'custo_energia'                 => (float) ($row['custo_energia'] ?? 0),
-            'custo_desgaste'                => (float) ($row['custo_desgaste'] ?? 0),
-            'custo_total'                   => (float) ($row['custo_total'] ?? 0),
+            'custo_filamento'               => $custos['custo_filamento'],
+            'custo_energia'                 => $custos['custo_energia'],
+            'custo_desgaste'                => $custos['custo_desgaste'],
+            'custo_total'                   => $custos['custo_total'],
             'status'                        => (bool) ($row['status'] ?? true),
             'id_grade_produto'              => (int) ($row['id_grade_produto'] ?? 0),
         ];
@@ -1116,29 +1124,14 @@ class GradeProdutoService
 
     private function formatarDetalheProduto(array $row): array
     {
-        return [
-            'id'                            => (int) ($row['id'] ?? 0),
-            'sku'                           => $row['sku'] ?? '',
-            'nome_produto'                  => $row['nome_produto'] ?? '',
-            'codigo_base'                   => $row['codigo_base'] ?? null,
-            'partes'                        => $row['partes'] ?? '',
-            'descricao_combinacao'          => $row['descricao_combinacao'] ?? null,
-            'id_grade_produto_combinacao'   => !empty($row['id_grade_produto_combinacao'])
-                ? (int) $row['id_grade_produto_combinacao']
-                : null,
-            'peso_total'                    => (float) ($row['peso_total'] ?? 0),
-            'tempo_total'                   => $row['tempo_total'] ?? '00:00',
-            'custo_filamento'               => (float) ($row['custo_filamento'] ?? 0),
-            'custo_energia'                 => (float) ($row['custo_energia'] ?? 0),
-            'custo_desgaste'                => (float) ($row['custo_desgaste'] ?? 0),
-            'custo_total'                   => (float) ($row['custo_total'] ?? 0),
-            'status'                        => (bool) ($row['status'] ?? true),
-            'id_grade_produto'              => (int) ($row['id_grade_produto'] ?? 0),
-            'id_produto_base'               => (int) ($row['id_produto_base'] ?? 0),
-            'descricao_grade'               => $row['descricao_grade'] ?? null,
-            'created_at'                    => $row['created_at'] ?? null,
-            'updated_at'                    => $row['updated_at'] ?? null,
-        ];
+        $base = $this->formatarListagemProduto($row);
+
+        return array_merge($base, [
+            'id_produto_base'  => (int) ($row['id_produto_base'] ?? 0),
+            'descricao_grade'  => $row['descricao_grade'] ?? null,
+            'created_at'       => $row['created_at'] ?? null,
+            'updated_at'       => $row['updated_at'] ?? null,
+        ]);
     }
 
     private function formatarAsyncProduto(array $row): array

@@ -4,6 +4,7 @@ namespace App\Services\ProjetoImpressao;
 
 use App\Repositories\ProjetoImpressao\ProjetoImpressaoRepository;
 use App\Services\PaginateService;
+use App\Services\ProjetoImpressao\ProjetoImpressaoCustoService;
 use App\Services\ProjetoImpressaoParte\ProjetoImpressaoParteService;
 use Exception;
 use Illuminate\Support\Facades\DB;
@@ -14,10 +15,13 @@ class ProjetoImpressaoService
 
     private ProjetoImpressaoParteService $_parteService;
 
+    private ProjetoImpressaoCustoService $_custoService;
+
     public function __construct()
     {
-        $this->_repository   = new ProjetoImpressaoRepository();
-        $this->_parteService = new ProjetoImpressaoParteService();
+        $this->_repository    = new ProjetoImpressaoRepository();
+        $this->_parteService  = new ProjetoImpressaoParteService();
+        $this->_custoService  = new ProjetoImpressaoCustoService();
     }
 
     public function handleLookupsProjetoImpressao(): array
@@ -194,6 +198,18 @@ class ProjetoImpressaoService
             $atributes->perPage,
             ['path' => $atributes->url, 'query' => $atributes->query]
         );
+
+        $idsProjetos = $resultado->getCollection()->pluck('id')->map(fn ($id) => (int) $id)->toArray();
+        $custosPorProjeto = $this->_custoService->calcularCustosExibicaoPorProjetos($idsProjetos);
+
+        $resultado->getCollection()->transform(function ($row) use ($custosPorProjeto) {
+            $data = (array) $row;
+            $idProjeto = (int) ($data['id'] ?? 0);
+            $custos = $custosPorProjeto[$idProjeto] ?? $this->_custoService->formatarCustosResposta(null);
+
+            return (object) array_merge($data, $custos);
+        });
+
         $resultado->appends((array) $atributes);
 
         return collect($resultado)->toArray();
@@ -223,6 +239,7 @@ class ProjetoImpressaoService
         }
 
         $data = collect($record)->toArray();
+        $data = $this->_custoService->appendCustosExibicaoProjeto($data, (int) $id);
         $data['partes'] = $this->_parteService->getPartesByProjeto((int) $id);
 
         return $data;

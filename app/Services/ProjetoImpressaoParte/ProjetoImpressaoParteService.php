@@ -222,6 +222,17 @@ class ProjetoImpressaoParteService
             ['path' => $atributes->url, 'query' => $atributes->query]
         );
 
+        $idsPartes = $resultado->getCollection()->pluck('id')->map(fn ($id) => (int) $id)->toArray();
+        $custosPorParte = $this->_custoService->calcularCustosExibicaoPorPartes($idsPartes);
+
+        $resultado->getCollection()->transform(function ($row) use ($custosPorParte) {
+            $data = (array) $row;
+            $idParte = (int) ($data['id'] ?? 0);
+            $custos = $custosPorParte[$idParte] ?? $this->_custoService->formatarCustosResposta(null);
+
+            return (object) array_merge($data, $custos);
+        });
+
         $resultado->appends((array) $atributes);
 
         return collect($resultado)->toArray();
@@ -254,6 +265,7 @@ class ProjetoImpressaoParteService
         }
 
         $data = collect($record)->toArray();
+        $data = $this->_custoService->appendCustosExibicaoRegistro($data, (int) $id);
         $data['itens'] = $this->_itemService->getItensByParte((int) $id);
 
         return $data;
@@ -296,6 +308,7 @@ class ProjetoImpressaoParteService
             ->get()
             ->map(function ($parte) {
                 $data = (array) $parte;
+                $data = $this->_custoService->appendCustosExibicaoRegistro($data, (int) $parte->id);
                 $data['itens'] = $this->_itemService->getItensByParte((int) $parte->id);
 
                 return $data;

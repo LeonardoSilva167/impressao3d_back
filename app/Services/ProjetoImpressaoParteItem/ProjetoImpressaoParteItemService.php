@@ -251,7 +251,11 @@ class ProjetoImpressaoParteItemService
         );
 
         $resultado->getCollection()->transform(function ($item) {
-            return (object) $this->_calculoService->appendCamposVirtuais($item);
+            $data = $this->_calculoService->appendCamposVirtuais($item);
+
+            return (object) $this->_custoService->appendCustosExibicaoItem(
+                is_array($data) ? $data : (array) $data
+            );
         });
 
         $resultado->appends((array) $atributes);
@@ -285,7 +289,9 @@ class ProjetoImpressaoParteItemService
             throw new Exception('Item da parte não encontrado', 404);
         }
 
-        return $this->_calculoService->appendCamposVirtuais(collect($record)->toArray());
+        return $this->_custoService->appendCustosExibicaoItem(
+            $this->_calculoService->appendCamposVirtuais(collect($record)->toArray())
+        );
     }
 
     public function getProjetoImpressaoParteItemAsync(object $params): array
@@ -325,7 +331,11 @@ class ProjetoImpressaoParteItemService
             ->where('ent.id_projeto_impressao_parte', $idParte)
             ->orderBy('ent.nome_item')
             ->get()
-            ->map(fn ($item) => $this->_calculoService->appendCamposVirtuais((array) $item))
+            ->map(function ($item) {
+                $data = $this->_calculoService->appendCamposVirtuais((array) $item);
+
+                return $this->_custoService->appendCustosExibicaoItem($data);
+            })
             ->toArray();
     }
 
