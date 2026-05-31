@@ -107,6 +107,10 @@ class GradeProdutoItemRepository
         return DB::table('grade_produto_itens as gpi')
             ->join('grades_produtos as gp', 'gp.id', '=', 'gpi.id_grade_produto')
             ->join('produtos_base as pb', 'pb.id', '=', 'gp.id_produto_base')
+            ->leftJoin('grade_produto_combinacoes as gpc', function ($join) {
+                $join->on('gpc.id', '=', 'gpi.id_grade_produto_combinacao')
+                    ->whereNull('gpc.deleted_at');
+            })
             ->whereNull('gpi.deleted_at')
             ->whereNull('gp.deleted_at')
             ->whereNull('pb.deleted_at')

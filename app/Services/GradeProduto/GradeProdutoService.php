@@ -454,12 +454,7 @@ class GradeProdutoService
         $query = $this->_itemRepository->getAsyncQuery();
 
         if (!empty($params->palavra_chave)) {
-            $chave = $params->palavra_chave;
-            $query->where(function ($q) use ($chave) {
-                $q->where('gpi.nome_produto', 'like', '%' . $chave . '%')
-                    ->orWhere('gpi.sku', 'like', '%' . $chave . '%')
-                    ->orWhere('pb.codigo_base', 'like', '%' . $chave . '%');
-            });
+            $this->aplicarFiltroBuscaTexto($query, (string) $params->palavra_chave, true);
             $query->limit(10);
         }
 
@@ -1024,6 +1019,12 @@ class GradeProdutoService
             $query->where('gpi.status', $this->normalizarStatus($atributes->status));
         }
 
+        $descricaoCombinacao = $atributes->descricao_combinacao ?? $atributes->descricao ?? null;
+
+        if (!empty($descricaoCombinacao)) {
+            $query->where('gpc.descricao', 'like', '%' . (string) $descricaoCombinacao . '%');
+        }
+
         if (!empty($atributes->palavra_chave)) {
             $this->aplicarFiltroBuscaTexto($query, (string) $atributes->palavra_chave, true);
         }
@@ -1034,7 +1035,8 @@ class GradeProdutoService
         $like = '%' . $termo . '%';
 
         $query->where(function ($q) use ($like, $incluirSkuCodigo) {
-            $q->where('gpi.nome_produto', 'like', $like);
+            $q->where('gpi.nome_produto', 'like', $like)
+                ->orWhere('gpc.descricao', 'like', $like);
 
             if ($incluirSkuCodigo) {
                 $q->orWhere('gpi.sku', 'like', $like)
@@ -1043,26 +1045,19 @@ class GradeProdutoService
 
             $q->orWhereExists(function ($sub) use ($like) {
                 $sub->select(DB::raw(1))
-                    ->from('grade_produto_combinacoes as gpc_b')
-                    ->whereColumn('gpc_b.id_grade_produto', 'gpi.id_grade_produto')
-                    ->whereNull('gpc_b.deleted_at')
-                    ->where('gpc_b.descricao', 'like', $like);
-            })->orWhereExists(function ($sub) use ($like) {
-                $sub->select(DB::raw(1))
                     ->from('grade_produto_partes as gpp_b')
                     ->join('projetos_impressao_partes as parte_b', 'parte_b.id', '=', 'gpp_b.id_parte_projeto')
                     ->whereColumn('gpp_b.id_grade_produto', 'gpi.id_grade_produto')
                     ->whereNull('gpp_b.deleted_at')
                     ->whereNull('parte_b.deleted_at')
+                    ->whereNull('gpi.id_grade_produto_combinacao')
                     ->where('parte_b.nome_parte', 'like', $like);
             })->orWhereExists(function ($sub) use ($like) {
                 $sub->select(DB::raw(1))
                     ->from('grade_produto_combinacao_partes as gpcp_b')
-                    ->join('grade_produto_combinacoes as gpc_b', 'gpc_b.id', '=', 'gpcp_b.id_grade_produto_combinacao')
                     ->join('projetos_impressao_partes as parte_b', 'parte_b.id', '=', 'gpcp_b.id_parte_projeto')
-                    ->whereColumn('gpc_b.id_grade_produto', 'gpi.id_grade_produto')
+                    ->whereColumn('gpcp_b.id_grade_produto_combinacao', 'gpi.id_grade_produto_combinacao')
                     ->whereNull('gpcp_b.deleted_at')
-                    ->whereNull('gpc_b.deleted_at')
                     ->whereNull('parte_b.deleted_at')
                     ->where('parte_b.nome_parte', 'like', $like);
             });
