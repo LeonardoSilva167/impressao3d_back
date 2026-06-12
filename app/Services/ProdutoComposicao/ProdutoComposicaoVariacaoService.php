@@ -161,12 +161,22 @@ class ProdutoComposicaoVariacaoService
                     !empty($filamento->id_item) ? (int) $filamento->id_item : null,
                 );
 
+            $variacao = $variacoesPorId[$idVariacao];
+            $custos   = $this->_custoService->calcularCustosExibicao(
+                $pesoItem,
+                $precoMedioGrama,
+                (string) ($variacao->tempo_impressao ?? '00:00'),
+            );
 
             $this->_filamentoRepository->create([
                 'id_variacao'       => $idVariacao,
                 'id_filamento'      => (int) $payload->id_filamento,
                 'preco_medio_grama' => $precoMedioGrama,
                 'peso_item'         => $pesoItem,
+                'custo_filamento'   => $custos['custo_filamento'],
+                'custo_energia'     => $custos['custo_energia'],
+                'custo_desgaste'    => $custos['custo_desgaste'],
+                'custo_total'       => $custos['custo_total'],
             ]);
         }
 

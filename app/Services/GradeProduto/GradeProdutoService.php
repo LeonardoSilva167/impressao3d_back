@@ -690,7 +690,7 @@ class GradeProdutoService
             }
 
             $variacoesComFilamento = $variacoes->filter(function ($variacao) {
-                return !empty($variacao->id_filamento) && !empty($variacao->custo_total);
+                return !empty($variacao->id_filamento);
             });
 
             if ($variacoesComFilamento->isEmpty()) {
@@ -972,11 +972,14 @@ class GradeProdutoService
                 'id_grade_produto'              => $idGrade,
                 'id_grade_produto_combinacao'   => $produto['id_grade_produto_combinacao'] ?? null,
                 'nome_produto'                  => $produto['nome_produto'],
-                'sku'              => $produto['sku'],
-                'peso_total'       => $produto['peso_total'],
-                'tempo_total'      => $produto['tempo_total'],
-                'custo_filamento'  => $produto['custo_filamento'],
-                'status'           => true,
+                'sku'                           => $produto['sku'],
+                'peso_total'                    => $produto['peso_total'],
+                'tempo_total'                   => $produto['tempo_total'],
+                'custo_filamento'               => $produto['custo_filamento'],
+                'custo_energia'                 => $produto['custo_energia'] ?? 0,
+                'custo_desgaste'                => $produto['custo_desgaste'] ?? 0,
+                'custo_total'                   => $produto['custo_total'] ?? $produto['custo_filamento'],
+                'status'                        => true,
             ]);
         }
     }

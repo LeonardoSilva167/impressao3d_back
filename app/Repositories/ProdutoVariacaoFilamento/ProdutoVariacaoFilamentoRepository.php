@@ -18,10 +18,10 @@ class ProdutoVariacaoFilamentoRepository
             return;
         }
 
-        ProdutoVariacaoFilamento::whereIn('id_variacao', $idsVariacao)
-            ->whereNull('deleted_at')
+        ProdutoVariacaoFilamento::withTrashed()
+            ->whereIn('id_variacao', $idsVariacao)
             ->get()
-            ->each(fn (ProdutoVariacaoFilamento $filamento) => $filamento->delete());
+            ->each(fn (ProdutoVariacaoFilamento $filamento) => $filamento->forceDelete());
     }
 
     public function deleteByComposicaoId(int $idComposicao): void
