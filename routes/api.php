@@ -24,6 +24,7 @@ Route::prefix('v1')->group(function () {
     Route::prefix('categorias-itens')->group(function () {require __DIR__ . '/routerFiles/categoriasItensRouter.php';});// Rota de Categorias de Itens
     Route::prefix('itens')->group(function () {require __DIR__ . '/routerFiles/itensRouter.php';});// Rota de Itens
     Route::prefix('compras')->group(function () {require __DIR__ . '/routerFiles/comprasRouter.php';});// Rota de Compras
+    Route::prefix('analise-compras')->group(function () {require __DIR__ . '/routerFiles/analiseComprasRouter.php';});// Rota de Análise de Compras
     Route::prefix('compras-itens')->group(function () {require __DIR__ . '/routerFiles/comprasItensRouter.php';});// Rota de Itens da Compra
     Route::prefix('estoque')->group(function () {require __DIR__ . '/routerFiles/estoqueRouter.php';});// Rota de Estoque e Lotes
     Route::prefix('carreteis-finalizados')->group(function () {require __DIR__ . '/routerFiles/carreteisFinalizadosRouter.php';});// Rota de Carretéis Finalizados
