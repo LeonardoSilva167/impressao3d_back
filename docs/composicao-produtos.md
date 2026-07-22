@@ -95,12 +95,46 @@ Uma variação = um item + um tipo de cor + uma cor. **Sem combinações entre i
 
 ## Cadastro — `POST /cadastrar`
 
+**Request:**
+
 ```json
 {
   "id_produto": 1,
   "id_projeto_impressao": 2
 }
 ```
+
+**Response:**
+
+```json
+{
+  "produtoComposicao": {
+    "data": {
+      "id": 6,
+      "id_produto": 7,
+      "id_projeto_impressao": 12,
+      "produto": {
+        "descricao_produto": "Porta Joias",
+        "sku_base": "1000-prtjs-mncrc",
+        "codigo_base": "1000"
+      },
+      "projeto": {
+        "nome_original_projeto": "Porta Joias Mini",
+        "codigo_projeto": "PRTJS-001",
+        "descricao_projeto": "...",
+        "partes": []
+      },
+      "quantidade_variacoes": 0
+    },
+    "status": true,
+    "message": "Composição do produto cadastrada com sucesso!"
+  }
+}
+```
+
+Path canônico do `id` (fluxo de produção / redirect para view do vínculo): `produtoComposicao.data.id`.
+
+> **Importante para o front:** o `id` **não** fica em `response.id` nem em `response.data.id` no topo. Está dentro do envelope `produtoComposicao`.
 
 ---
 

@@ -50,6 +50,40 @@ Informações gerais do MakerWorld.
 
 `GET /listar/{id}` retorna o projeto com `partes[]`, cada parte com `itens[]`.
 
+### Cadastro — `POST /cadastrar`
+
+**Request (exemplo):**
+
+```json
+{
+  "url_projeto": "https://makerworld.com/...",
+  "nome_original_projeto": "Porta Joias Mini",
+  "codigo_projeto": "PRTJS-001",
+  "descricao_projeto": "Projeto MakerWorld"
+}
+```
+
+**Response:**
+
+```json
+{
+  "projetoImpressao": {
+    "data": {
+      "id": 12,
+      "url_projeto": "https://makerworld.com/...",
+      "nome_original_projeto": "Porta Joias Mini",
+      "codigo_projeto": "PRTJS-001",
+      "descricao_projeto": "Projeto MakerWorld",
+      "partes": []
+    },
+    "status": true,
+    "message": "Projeto de impressão cadastrado com sucesso!"
+  }
+}
+```
+
+Path canônico do `id` (fluxo de produção / redirect): `projetoImpressao.data.id`.
+
 ---
 
 ## Parte

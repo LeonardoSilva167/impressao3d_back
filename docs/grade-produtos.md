@@ -181,6 +181,8 @@ Localiza automaticamente a composição ativa do produto base e retorna partes, 
 
 ## Cadastro — `POST /cadastrar`
 
+**Request:**
+
 ```json
 {
   "id_produto_base": 1,
@@ -211,6 +213,27 @@ Localiza automaticamente a composição ativa do produto base e retorna partes, 
   ]
 }
 ```
+
+**Response:**
+
+```json
+{
+  "gradeProduto": {
+    "data": {
+      "id": 3,
+      "id_produto_base": 1,
+      "descricao_grade": "Grade Principal",
+      "status": true,
+      "partes": [],
+      "combinacoes": []
+    },
+    "status": true,
+    "message": "Grade de produtos cadastrada com sucesso!"
+  }
+}
+```
+
+Path canônico do `id` (fluxo de produção / redirect): `gradeProduto.data.id`.
 
 ---
 

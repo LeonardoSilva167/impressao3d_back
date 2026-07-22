@@ -74,6 +74,43 @@ Retorna apenas os dados do produto base (descrição, SKU, categoria, modelo, li
 
 ---
 
+## Cadastro — `POST /produtos/cadastrar`
+
+**Request (exemplo):**
+
+```json
+{
+  "descricao_produto": "Porta Joias",
+  "id_categoria": 1,
+  "id_modelo": 2,
+  "id_linha": 3
+}
+```
+
+**Response:**
+
+```json
+{
+  "produtoBase": {
+    "data": {
+      "id": 7,
+      "descricao_produto": "Porta Joias",
+      "codigo_base": "1000",
+      "sku_base": "1000-prtjs-mncrc-ephvl",
+      "id_categoria": 1,
+      "id_modelo": 2,
+      "id_linha": 3
+    },
+    "status": true,
+    "message": "Produto base cadastrado com sucesso!"
+  }
+}
+```
+
+Path canônico do `id` (fluxo de produção / redirect): `produtoBase.data.id`.
+
+---
+
 ## Observações
 
 - Lookups retornam `proximoCodigoBase` para exibição no front.
