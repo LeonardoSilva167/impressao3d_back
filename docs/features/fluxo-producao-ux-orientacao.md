@@ -357,9 +357,9 @@ Retorna subpassos da seção 3.2 + ids relacionados (`projeto_id`, `composicao_i
 
 ## 7. Checklist de alinhamento backend (para o time da API)
 
-- [ ] `composicao-produtos/cadastrar` sempre retorna `id` do vínculo criado.
-- [ ] Demais creates do fluxo retornam `id` de forma consistente.
-- [ ] (Fase 4+) View da composição inclui por parte: `configurada`, `total_variacoes` (e opcionalmente contadores auxiliares).
+- [x] `composicao-produtos/cadastrar` sempre retorna `id` do vínculo criado.
+- [x] Demais creates do fluxo retornam `id` de forma consistente.
+- [x] (Fase 4+) View da composição inclui por parte: `configurada`, `total_variacoes` (e opcionalmente contadores auxiliares).
 - [x] (Fase 6) Endpoint ou payload de progresso do fluxo por `produto_id`.
 - [x] Confirmar regra de negócio: montagem exige **todas** as partes configuradas ou permite parcial? **Exige todas** (B3).
 

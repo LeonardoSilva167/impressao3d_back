@@ -45,22 +45,20 @@ Todos seguem o padrão do template: `handleAdd*` devolve objeto com chave da ent
 
 ### 2.2 View da composição — `GET /composicao-produtos/listar/{id}`
 
-`getPartesResumoComposicao` já retorna por parte:
+`getPartesResumoComposicao` retorna por parte (contrato B2):
 
-| Campo atual | Tipo | Observação |
-|-------------|------|------------|
+| Campo | Tipo | Observação |
+|-------|------|------------|
 | `id` | int | = `id_projeto_impressao_parte` |
+| `id_projeto_impressao_parte` | int | Alias explícito de `id` |
 | `nome_parte` | string | |
 | `quantidade_itens` | int | |
 | `cores_configuradas` | bool | |
 | `variacoes_geradas` | bool | |
-| `quantidade_variacoes` | int | total de variações da parte |
-
-**Faltam** (pedido da UX Fase 4):
-
-- `configurada` (agregado)
-- `total_variacoes` (alias estável para o front; pode espelhar `quantidade_variacoes`)
-- `variacoes_com_filamento`
+| `quantidade_variacoes` | int | Legado (= `total_variacoes`) |
+| `total_variacoes` | int | Alias estável |
+| `variacoes_com_filamento` | int | Contagem com filamento preenchido |
+| `configurada` | bool | Regra §4 (calculado, não persistido) |
 
 ### 2.3 Progresso do fluxo
 
@@ -169,7 +167,7 @@ Path para redirect: `produtoComposicao.data.id`.
 **Critérios de aceite**
 
 - [x] Docs de create dos 4 módulos listam o envelope e o path do `id`.
-- [ ] Front confirma leitura correta (ou aponta gap → Fase B1).
+- [x] Front confirma leitura correta (ou aponta gap → Fase B1).
 
 **Auditoria código (2026-07-22)**
 
@@ -180,7 +178,9 @@ Path para redirect: `produtoComposicao.data.id`.
 | Composição | `ProdutoComposicaoService::createProdutoComposicao` | `getProdutoComposicaoId` | sim (`produtoComposicao.data.id`) |
 | Grade | `GradeProdutoService::createGradeProduto` | `getGradeProdutoGradeId` | sim (`gradeProduto.data.id`) |
 
-Conclusão: **nenhum gap de API** para B1 — o contrato já está estável. Pendência só de confirmação do front (path do envelope).
+Conclusão: **nenhum gap de API** para B1 — o contrato já está estável.
+
+**Confirmação front (2026-07-22):** os services leem o envelope canônico — `produtoBase.data.id`, `projetoImpressao.data.id`, `produtoComposicao.data.id`, `gradeProduto.data.id`.
 
 **Arquivos / padrão**
 
@@ -229,8 +229,8 @@ Se o front não puder adaptar o path do envelope no curto prazo, adicionar no **
 
 **Critérios de aceite**
 
-- [x] `POST composicao-produtos/cadastrar` → front consegue `id` e redireciona para view. *(API ok; falta validar no front)*
-- [x] Demais creates do fluxo idem. *(API ok)*
+- [x] `POST composicao-produtos/cadastrar` → front consegue `id` e redireciona para view.
+- [x] Demais creates do fluxo idem.
 - [x] Estrutura `{ data, status, message }` preservada (regra do template).
 
 **Padrão**
@@ -504,13 +504,23 @@ UX Fase 6  → B4 (GET /fluxo-producao/progresso)
 
 ## 7. Checklist de alinhamento (API)
 
+Status final — todas as entregas B0–B4 concluídas e confirmadas no front:
+
 - [x] **B0** Creates documentados com path do `id`.
-- [x] **B1** `composicao-produtos/cadastrar` sempre permite obter `id` do vínculo criado. *(já ok no código; sem mudança necessária)*
-- [x] **B1** Demais creates do fluxo consistentes com o template (`data` + `status` + `message`). *(já ok no código; sem mudança necessária)*
+- [x] **B0** Front lê envelopes corretos (`*.data.id`) nos 4 creates do fluxo.
+- [x] **B1** `composicao-produtos/cadastrar` sempre permite obter `id` do vínculo criado.
+- [x] **B1** Demais creates do fluxo consistentes com o template (`data` + `status` + `message`).
 - [x] **B2** View composição: `configurada`, `total_variacoes`, `variacoes_com_filamento` (e alias `id_projeto_impressao_parte`).
 - [x] **B3** Grade exige todas as partes configuradas (`422` + `partes_pendentes`).
 - [x] **B4** `GET /fluxo-producao/progresso?produto={id}` com subpassos + `partes_resumo`.
 - [x] Regra única de “parte configurada” compartilhada (composição + progresso + grade).
+
+| Envelope create | Path do `id` (front) |
+|-----------------|----------------------|
+| `produtoBase` | `produtoBase.data.id` |
+| `projetoImpressao` | `projetoImpressao.data.id` |
+| `produtoComposicao` | `produtoComposicao.data.id` |
+| `gradeProduto` | `gradeProduto.data.id` |
 
 ---
 
