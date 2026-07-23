@@ -361,9 +361,15 @@ class ProdutoComposicaoService
         return [
             'id'                   => (int) $record->id,
             'id_produto'           => (int) $record->id_produto,
+            'id_produto_base'      => (int) $record->id_produto,
             'id_projeto_impressao' => (int) $record->id_projeto_impressao,
             'created_at'           => $record->created_at,
             'updated_at'           => $record->updated_at,
+            'produto_descricao'    => $record->descricao_produto,
+            'sku_base'             => $record->sku_base,
+            'codigo_projeto'       => $record->codigo_projeto,
+            'nome_projeto'         => $record->nome_original_projeto,
+            'descricao_projeto'    => $record->descricao_projeto,
             'produto'              => [
                 'descricao_produto' => $record->descricao_produto,
                 'sku_base'          => $record->sku_base,
@@ -375,6 +381,7 @@ class ProdutoComposicaoService
                 'descricao_projeto'     => $record->descricao_projeto,
                 'partes'                => $partes,
             ],
+            'partes_resumo'        => $partes,
             'quantidade_variacoes' => $this->_variacaoRepository->countByComposicaoId((int) $record->id),
         ];
     }
@@ -517,7 +524,11 @@ class ProdutoComposicaoService
         ];
     }
 
-    private function getPartesResumoComposicao(int $idComposicao, int $idProjeto): array
+    /**
+     * Resumo agregado por parte (status de configuração do fluxo).
+     * `configurada` é sempre calculado — não persiste em coluna.
+     */
+    public function getPartesResumoComposicao(int $idComposicao, int $idProjeto): array
     {
         return DB::table('projetos_impressao_partes as parte')
             ->select(
@@ -530,15 +541,28 @@ class ProdutoComposicaoService
             ->orderBy('parte.nome_parte')
             ->get()
             ->map(function ($parte) use ($idComposicao) {
-                $idParte = (int) $parte->id;
+                $idParte               = (int) $parte->id;
+                $coresConfiguradas     = $this->_corRepository->partePossuiCores($idComposicao, $idParte);
+                $variacoesGeradas      = $this->_variacaoRepository->partePossuiVariacoes($idComposicao, $idParte);
+                $totalVariacoes        = $this->_variacaoRepository->countByComposicaoId($idComposicao, $idParte);
+                $variacoesComFilamento = $this->_filamentoRepository->countComFilamentoByComposicaoId($idComposicao, $idParte);
+
+                $configurada = $coresConfiguradas
+                    && $variacoesGeradas
+                    && $totalVariacoes > 0
+                    && $variacoesComFilamento === $totalVariacoes;
 
                 return [
-                    'id'                  => $idParte,
-                    'nome_parte'          => $parte->nome_parte,
-                    'quantidade_itens'    => (int) $parte->quantidade_itens,
-                    'cores_configuradas'  => $this->_corRepository->partePossuiCores($idComposicao, $idParte),
-                    'variacoes_geradas'   => $this->_variacaoRepository->partePossuiVariacoes($idComposicao, $idParte),
-                    'quantidade_variacoes' => $this->_variacaoRepository->countByComposicaoId($idComposicao, $idParte),
+                    'id'                         => $idParte,
+                    'id_projeto_impressao_parte' => $idParte,
+                    'nome_parte'                 => $parte->nome_parte,
+                    'quantidade_itens'           => (int) $parte->quantidade_itens,
+                    'cores_configuradas'         => $coresConfiguradas,
+                    'variacoes_geradas'          => $variacoesGeradas,
+                    'quantidade_variacoes'       => $totalVariacoes,
+                    'total_variacoes'            => $totalVariacoes,
+                    'variacoes_com_filamento'    => $variacoesComFilamento,
+                    'configurada'                => $configurada,
                 ];
             })
             ->values()

@@ -308,9 +308,11 @@ Caso contrário, deixar apenas para **B4**.
 
 **Critérios de aceite**
 
-- [ ] View da composição retorna `configurada`, `total_variacoes`, `variacoes_com_filamento` por parte.
-- [ ] Front consegue badge Configurada/Pendente sem recalcular filamentos no client.
-- [ ] SoftDeletes respeitados em todas as contagens.
+- [x] View da composição retorna `configurada`, `total_variacoes`, `variacoes_com_filamento` por parte.
+- [x] Front consegue badge Configurada/Pendente sem recalcular filamentos no client.
+- [x] SoftDeletes respeitados em todas as contagens.
+
+**Implementação:** `ProdutoVariacaoFilamentoRepository::countComFilamentoByComposicaoId` + `ProdutoComposicaoService::getPartesResumoComposicao` (público) + `partes_resumo` no `GET listar/{id}`.
 
 **Docs a atualizar:** `docs/composicao-produtos.md`.
 
@@ -501,7 +503,7 @@ UX Fase 6  → B4 (GET /fluxo-producao/progresso)
 - [x] **B0** Creates documentados com path do `id`.
 - [x] **B1** `composicao-produtos/cadastrar` sempre permite obter `id` do vínculo criado. *(já ok no código; sem mudança necessária)*
 - [x] **B1** Demais creates do fluxo consistentes com o template (`data` + `status` + `message`). *(já ok no código; sem mudança necessária)*
-- [ ] **B2** View composição: `configurada`, `total_variacoes`, `variacoes_com_filamento` (e alias `id_projeto_impressao_parte`).
+- [x] **B2** View composição: `configurada`, `total_variacoes`, `variacoes_com_filamento` (e alias `id_projeto_impressao_parte`).
 - [ ] **B3** Grade exige todas as partes configuradas (`422` + `partes_pendentes`).
 - [ ] **B4** `GET /fluxo-producao/progresso?produto={id}` com subpassos + `partes_resumo`.
 - [ ] Regra única de “parte configurada” compartilhada (composição + progresso + grade).

@@ -140,7 +140,38 @@ Path canônico do `id` (fluxo de produção / redirect para view do vínculo): `
 
 ## Visualização — `GET /listar/{id}`
 
-Retorna partes com `quantidade_itens`, flags `cores_configuradas` e `variacoes_geradas`. **Sem campos de cor.**
+Retorna o vínculo com `partes_resumo` (também em `projeto.partes`). **Sem campos de cor.**
+
+Cada parte inclui:
+
+| Campo | Descrição |
+|-------|-----------|
+| `id` / `id_projeto_impressao_parte` | Id da parte do projeto |
+| `nome_parte` | Nome |
+| `quantidade_itens` | Qtd. de itens da parte |
+| `cores_configuradas` | Possui cores em `produto_composicao_cores` |
+| `variacoes_geradas` | Possui variações em `produto_variacoes` |
+| `quantidade_variacoes` | Total de variações (legado) |
+| `total_variacoes` | Alias estável de `quantidade_variacoes` |
+| `variacoes_com_filamento` | Variações com `id_filamento` preenchido |
+| `configurada` | `cores ∧ variações ∧ total > 0 ∧ filamentos = total` |
+
+Exemplo de item em `partes_resumo`:
+
+```json
+{
+  "id": 16,
+  "id_projeto_impressao_parte": 16,
+  "nome_parte": "Base",
+  "quantidade_itens": 3,
+  "cores_configuradas": true,
+  "variacoes_geradas": true,
+  "quantidade_variacoes": 4,
+  "total_variacoes": 4,
+  "variacoes_com_filamento": 2,
+  "configurada": false
+}
+```
 
 ---
 
