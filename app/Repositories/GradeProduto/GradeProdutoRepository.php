@@ -13,6 +13,14 @@ class GradeProdutoRepository
         return GradeProduto::where('id', $id)->whereNull('deleted_at')->first();
     }
 
+    public function findMaisRecenteByProdutoBaseId(int $idProdutoBase): ?GradeProduto
+    {
+        return GradeProduto::where('id_produto_base', $idProdutoBase)
+            ->whereNull('deleted_at')
+            ->orderByDesc('created_at')
+            ->first();
+    }
+
     public function create(array $data): GradeProduto
     {
         return GradeProduto::create($data);

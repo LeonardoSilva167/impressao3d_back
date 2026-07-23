@@ -64,7 +64,9 @@ Todos seguem o padrão do template: `handleAdd*` devolve objeto com chave da ent
 
 ### 2.3 Progresso do fluxo
 
-Não existe endpoint agregado. Front monta checklist com query string + GETs avulsos.
+**Endpoint:** `GET /api/v1/fluxo-producao/progresso?produto={id}`
+
+Resolve `composicao_id` / `projeto_id` / `grade_id` a partir do produto (mais recente), devolve `partes_resumo` (mesma regra B2) e `subpassos` + `proximo_subpasso`.
 
 ---
 
@@ -365,13 +367,13 @@ Módulo de **leitura** (não é CRUD completo). Ainda assim segue o template naq
 
 #### B4.1 Checklist de geração (adaptado do template)
 
-- [ ] ~~Migration~~ — N/A (agrega dados existentes)
-- [ ] ~~Model~~ — N/A
-- [ ] Controller — `app/Http/Controllers/FluxoProducaoController.php`
-- [ ] Service — `app/Services/FluxoProducao/FluxoProducaoService.php`
-- [ ] Router — `routes/routerFiles/fluxoProducaoRouter.php`
-- [ ] Registro em `routes/api.php`
-- [ ] Doc — este arquivo + referência em docs dos módulos relacionados
+- [x] ~~Migration~~ — N/A (agrega dados existentes)
+- [x] ~~Model~~ — N/A
+- [x] Controller — `app/Http/Controllers/FluxoProducaoController.php`
+- [x] Service — `app/Services/FluxoProducao/FluxoProducaoService.php`
+- [x] Router — `routes/routerFiles/fluxoProducaoRouter.php`
+- [x] Registro em `routes/api.php`
+- [x] Doc — este arquivo + referência em docs dos módulos relacionados
 
 #### B4.2 Rotas
 
@@ -479,10 +481,10 @@ Route::prefix('fluxo-producao')->group(function () {
 
 **Critérios de aceite**
 
-- [ ] Hub consegue montar checklist só com `produto_id`, mesmo sem query completa.
-- [ ] `partes_resumo` idêntico em semântica ao view da composição (B2).
-- [ ] SoftDeletes respeitados.
-- [ ] Doc desta feature atualizada com exemplos reais.
+- [x] Hub consegue montar checklist só com `produto_id`, mesmo sem query completa.
+- [x] `partes_resumo` idêntico em semântica ao view da composição (B2).
+- [x] SoftDeletes respeitados.
+- [x] Doc desta feature atualizada com exemplos reais.
 
 ---
 
@@ -507,8 +509,8 @@ UX Fase 6  → B4 (GET /fluxo-producao/progresso)
 - [x] **B1** Demais creates do fluxo consistentes com o template (`data` + `status` + `message`). *(já ok no código; sem mudança necessária)*
 - [x] **B2** View composição: `configurada`, `total_variacoes`, `variacoes_com_filamento` (e alias `id_projeto_impressao_parte`).
 - [x] **B3** Grade exige todas as partes configuradas (`422` + `partes_pendentes`).
-- [ ] **B4** `GET /fluxo-producao/progresso?produto={id}` com subpassos + `partes_resumo`.
-- [ ] Regra única de “parte configurada” compartilhada (composição + progresso + grade).
+- [x] **B4** `GET /fluxo-producao/progresso?produto={id}` com subpassos + `partes_resumo`.
+- [x] Regra única de “parte configurada” compartilhada (composição + progresso + grade).
 
 ---
 

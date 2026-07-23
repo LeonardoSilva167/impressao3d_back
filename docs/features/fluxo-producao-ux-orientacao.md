@@ -360,8 +360,8 @@ Retorna subpassos da seção 3.2 + ids relacionados (`projeto_id`, `composicao_i
 - [ ] `composicao-produtos/cadastrar` sempre retorna `id` do vínculo criado.
 - [ ] Demais creates do fluxo retornam `id` de forma consistente.
 - [ ] (Fase 4+) View da composição inclui por parte: `configurada`, `total_variacoes` (e opcionalmente contadores auxiliares).
-- [ ] (Fase 6) Endpoint ou payload de progresso do fluxo por `produto_id`.
-- [ ] Confirmar regra de negócio: montagem exige **todas** as partes configuradas ou permite parcial?
+- [x] (Fase 6) Endpoint ou payload de progresso do fluxo por `produto_id`.
+- [x] Confirmar regra de negócio: montagem exige **todas** as partes configuradas ou permite parcial? **Exige todas** (B3).
 
 ---
 

@@ -25,6 +25,14 @@ class ProdutoComposicaoRepository
         return $query->first();
     }
 
+    public function findMaisRecenteByProdutoId(int $idProduto): ?ProdutoComposicao
+    {
+        return ProdutoComposicao::where('id_produto', $idProduto)
+            ->whereNull('deleted_at')
+            ->orderByDesc('created_at')
+            ->first();
+    }
+
     public function create(array $data): ProdutoComposicao
     {
         return ProdutoComposicao::create($data);
