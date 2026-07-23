@@ -2,6 +2,7 @@
 
 namespace App\Services\GradeProduto;
 
+use App\Exceptions\PartesPendentesMontagemException;
 use App\Models\ProdutoBase;
 use App\Repositories\GradeProduto\GradeProdutoRepository;
 use App\Repositories\GradeProdutoCombinacao\GradeProdutoCombinacaoRepository;
@@ -11,6 +12,7 @@ use App\Repositories\GradeProdutoParte\GradeProdutoParteRepository;
 use App\Repositories\ProdutoComposicao\ProdutoComposicaoRepository;
 use App\Repositories\ProdutoVariacao\ProdutoVariacaoRepository;
 use App\Services\PaginateService;
+use App\Services\ProdutoComposicao\ProdutoComposicaoService;
 use App\Services\ProdutoComposicao\ProdutoComposicaoVariacaoService;
 use App\Services\ProjetoImpressao\ProjetoImpressaoCustoService;
 use App\Services\ProjetoImpressaoParteItem\ProjetoImpressaoParteItemCalculoService;
@@ -35,6 +37,8 @@ class GradeProdutoService
 
     private GradeProdutoGeracaoService $_geracaoService;
 
+    private ProdutoComposicaoService $_composicaoService;
+
     private ProdutoComposicaoVariacaoService $_variacaoService;
 
     private ProjetoImpressaoParteItemCalculoService $_itemCalculoService;
@@ -51,6 +55,7 @@ class GradeProdutoService
         $this->_composicaoRepository       = new ProdutoComposicaoRepository();
         $this->_variacaoRepository         = new ProdutoVariacaoRepository();
         $this->_geracaoService             = new GradeProdutoGeracaoService();
+        $this->_composicaoService          = new ProdutoComposicaoService();
         $this->_variacaoService            = new ProdutoComposicaoVariacaoService();
         $this->_itemCalculoService         = new ProjetoImpressaoParteItemCalculoService();
         $this->_custoService               = new ProjetoImpressaoCustoService();
@@ -134,6 +139,8 @@ class GradeProdutoService
                 throw new Exception('Grade de produtos não encontrada', 404);
             }
 
+            $this->validatePartesConfiguradasParaMontagem((int) $record->id_produto_base);
+
             $combinacoes = $this->montarCombinacoesPayloadFromGrade((int) $idGrade);
 
             if (empty($combinacoes)) {
@@ -181,6 +188,8 @@ class GradeProdutoService
             throw new Exception('O produto base é obrigatório.', 422);
         }
 
+        $this->validatePartesConfiguradasParaMontagem($idProdutoBase);
+
         if (empty($combinacoes)) {
             throw new Exception('Informe ao menos uma combinação para o preview.', 422);
         }
@@ -207,6 +216,7 @@ class GradeProdutoService
 
             $idProdutoBase = (int) ($atributes->id_produto_base ?? 0);
             $this->validateProdutoPossuiComposicao($idProdutoBase);
+            $this->validatePartesConfiguradasParaMontagem($idProdutoBase);
 
             $descricao = trim((string) ($atributes->descricao ?? ''));
 
@@ -251,6 +261,7 @@ class GradeProdutoService
     {
         $idProdutoBase = (int) ($atributes->id_produto_base ?? 0);
         $this->validateProdutoPossuiComposicao($idProdutoBase);
+        $this->validatePartesConfiguradasParaMontagem($idProdutoBase);
 
         $grade = $this->_repository->create([
             'id_produto_base' => $idProdutoBase,
@@ -289,6 +300,7 @@ class GradeProdutoService
             : (int) $record->id_produto_base;
 
         $this->validateProdutoPossuiComposicao($idProdutoBase);
+        $this->validatePartesConfiguradasParaMontagem($idProdutoBase);
 
         $produtoAlterado = $idProdutoBase !== (int) $record->id_produto_base;
 
@@ -929,6 +941,41 @@ class GradeProdutoService
 
         if (!$this->_composicaoRepository->findAtivaByProdutoId($idProdutoBase)) {
             throw new Exception('Este produto base não possui composição cadastrada.', 422);
+        }
+    }
+
+    /**
+     * Exige todas as partes com configurada = true (regra §4 do fluxo de produção).
+     * Reutiliza ProdutoComposicaoService::getPartesResumoComposicao — sem fórmula paralela.
+     */
+    private function validatePartesConfiguradasParaMontagem(int $idProdutoBase): void
+    {
+        $composicao = $this->_composicaoRepository->findAtivaByProdutoId($idProdutoBase);
+
+        if (!$composicao) {
+            throw new Exception('Este produto base não possui composição cadastrada.', 422);
+        }
+
+        $partes = $this->_composicaoService->getPartesResumoComposicao(
+            (int) $composicao->id,
+            (int) $composicao->id_projeto_impressao,
+        );
+
+        $pendentes = [];
+
+        foreach ($partes as $parte) {
+            if (!empty($parte['configurada'])) {
+                continue;
+            }
+
+            $pendentes[] = [
+                'id_projeto_impressao_parte' => (int) ($parte['id_projeto_impressao_parte'] ?? $parte['id']),
+                'nome_parte'                 => (string) ($parte['nome_parte'] ?? 'Parte'),
+            ];
+        }
+
+        if (!empty($pendentes)) {
+            throw new PartesPendentesMontagemException($pendentes);
         }
     }
 

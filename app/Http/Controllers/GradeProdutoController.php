@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Exceptions\PartesPendentesMontagemException;
 use App\Http\Requests\GradeProduto\GradeProdutoCadastrarRequest;
 use App\Http\Requests\GradeProduto\GradeProdutoEditarRequest;
 use App\Http\Requests\GradeProduto\GradeProdutoGerarGradeRequest;
@@ -9,6 +10,7 @@ use App\Http\Requests\GradeProduto\GradeProdutoPreviewProdutosRequest;
 use App\Services\GradeProduto\GradeProdutoService;
 use App\Services\RequestDataService;
 use Exception;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class GradeProdutoController extends Controller
@@ -29,9 +31,7 @@ class GradeProdutoController extends Controller
             $result = $this->_service->handleLookupsGradeProduto();
             return response()->json($result, 200);
         } catch (Exception $ex) {
-            $statusCode = is_numeric($ex->getCode()) ? (int) $ex->getCode() : 500;
-            $statusCode = ($statusCode >= 100 && $statusCode <= 599) ? $statusCode : 500;
-            return response()->json(['error' => true, 'message' => $ex->getMessage()], $statusCode);
+            return $this->respondError($ex);
         }
     }
 
@@ -42,9 +42,7 @@ class GradeProdutoController extends Controller
             $result          = $this->_service->getGradeProdutoPaginate($objectAtributes);
             return response()->json($result, 200);
         } catch (Exception $ex) {
-            $statusCode = is_numeric($ex->getCode()) ? (int) $ex->getCode() : 500;
-            $statusCode = ($statusCode >= 100 && $statusCode <= 599) ? $statusCode : 500;
-            return response()->json(['error' => true, 'message' => $ex->getMessage()], $statusCode);
+            return $this->respondError($ex);
         }
     }
 
@@ -54,9 +52,7 @@ class GradeProdutoController extends Controller
             $result = $this->_service->getGradeProdutoId($id);
             return response()->json($result, 200);
         } catch (Exception $ex) {
-            $statusCode = is_numeric($ex->getCode()) ? (int) $ex->getCode() : 500;
-            $statusCode = ($statusCode >= 100 && $statusCode <= 599) ? $statusCode : 500;
-            return response()->json(['error' => true, 'message' => $ex->getMessage()], $statusCode);
+            return $this->respondError($ex);
         }
     }
 
@@ -66,9 +62,7 @@ class GradeProdutoController extends Controller
             $result = $this->_service->getGradeProdutoGradeId($id);
             return response()->json($result, 200);
         } catch (Exception $ex) {
-            $statusCode = is_numeric($ex->getCode()) ? (int) $ex->getCode() : 500;
-            $statusCode = ($statusCode >= 100 && $statusCode <= 599) ? $statusCode : 500;
-            return response()->json(['error' => true, 'message' => $ex->getMessage()], $statusCode);
+            return $this->respondError($ex);
         }
     }
 
@@ -84,9 +78,7 @@ class GradeProdutoController extends Controller
             $result = $this->_service->carregarComposicaoPorProdutoBase($idProdutoBase);
             return response()->json($result, 200);
         } catch (Exception $ex) {
-            $statusCode = is_numeric($ex->getCode()) ? (int) $ex->getCode() : 500;
-            $statusCode = ($statusCode >= 100 && $statusCode <= 599) ? $statusCode : 500;
-            return response()->json(['error' => true, 'message' => $ex->getMessage()], $statusCode);
+            return $this->respondError($ex);
         }
     }
 
@@ -97,9 +89,7 @@ class GradeProdutoController extends Controller
             $result          = $this->_service->handleAddGradeProduto($objectAtributes);
             return response()->json($result, 200);
         } catch (Exception $ex) {
-            $statusCode = is_numeric($ex->getCode()) ? (int) $ex->getCode() : 500;
-            $statusCode = ($statusCode >= 100 && $statusCode <= 599) ? $statusCode : 500;
-            return response()->json(['error' => true, 'message' => $ex->getMessage()], $statusCode);
+            return $this->respondError($ex);
         }
     }
 
@@ -110,9 +100,7 @@ class GradeProdutoController extends Controller
             $result          = $this->_service->handleEditGradeProduto($objectAtributes);
             return response()->json($result, 200);
         } catch (Exception $ex) {
-            $statusCode = is_numeric($ex->getCode()) ? (int) $ex->getCode() : 500;
-            $statusCode = ($statusCode >= 100 && $statusCode <= 599) ? $statusCode : 500;
-            return response()->json(['error' => true, 'message' => $ex->getMessage()], $statusCode);
+            return $this->respondError($ex);
         }
     }
 
@@ -122,9 +110,7 @@ class GradeProdutoController extends Controller
             $result = $this->_service->handleDeleteGradeProduto($id);
             return response()->json($result, 200);
         } catch (Exception $ex) {
-            $statusCode = is_numeric($ex->getCode()) ? (int) $ex->getCode() : 500;
-            $statusCode = ($statusCode >= 100 && $statusCode <= 599) ? $statusCode : 500;
-            return response()->json(['error' => true, 'message' => $ex->getMessage()], $statusCode);
+            return $this->respondError($ex);
         }
     }
 
@@ -135,9 +121,7 @@ class GradeProdutoController extends Controller
             $result          = $this->_service->handlePreviewProdutos($objectAtributes);
             return response()->json($result, 200);
         } catch (Exception $ex) {
-            $statusCode = is_numeric($ex->getCode()) ? (int) $ex->getCode() : 500;
-            $statusCode = ($statusCode >= 100 && $statusCode <= 599) ? $statusCode : 500;
-            return response()->json(['error' => true, 'message' => $ex->getMessage()], $statusCode);
+            return $this->respondError($ex);
         }
     }
 
@@ -154,9 +138,7 @@ class GradeProdutoController extends Controller
 
             return response()->json($result, 200);
         } catch (Exception $ex) {
-            $statusCode = is_numeric($ex->getCode()) ? (int) $ex->getCode() : 500;
-            $statusCode = ($statusCode >= 100 && $statusCode <= 599) ? $statusCode : 500;
-            return response()->json(['error' => true, 'message' => $ex->getMessage()], $statusCode);
+            return $this->respondError($ex);
         }
     }
 
@@ -166,9 +148,7 @@ class GradeProdutoController extends Controller
             $result = $this->_service->handleGerarProdutos((int) $id, true);
             return response()->json($result, 200);
         } catch (Exception $ex) {
-            $statusCode = is_numeric($ex->getCode()) ? (int) $ex->getCode() : 500;
-            $statusCode = ($statusCode >= 100 && $statusCode <= 599) ? $statusCode : 500;
-            return response()->json(['error' => true, 'message' => $ex->getMessage()], $statusCode);
+            return $this->respondError($ex);
         }
     }
 
@@ -179,9 +159,19 @@ class GradeProdutoController extends Controller
             $result = $this->_service->getGradeProdutoAsync($params);
             return response()->json($result, 200);
         } catch (Exception $ex) {
-            $statusCode = is_numeric($ex->getCode()) ? (int) $ex->getCode() : 500;
-            $statusCode = ($statusCode >= 100 && $statusCode <= 599) ? $statusCode : 500;
-            return response()->json(['error' => true, 'message' => $ex->getMessage()], $statusCode);
+            return $this->respondError($ex);
         }
+    }
+
+    private function respondError(Exception $ex): JsonResponse
+    {
+        if ($ex instanceof PartesPendentesMontagemException) {
+            return response()->json($ex->toArray(), 422);
+        }
+
+        $statusCode = is_numeric($ex->getCode()) ? (int) $ex->getCode() : 500;
+        $statusCode = ($statusCode >= 100 && $statusCode <= 599) ? $statusCode : 500;
+
+        return response()->json(['error' => true, 'message' => $ex->getMessage()], $statusCode);
     }
 }

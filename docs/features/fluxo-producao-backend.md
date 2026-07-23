@@ -346,9 +346,11 @@ Em `GradeProdutoService`, antes de criar/gerar:
 
 **Critérios de aceite**
 
-- [ ] Produto com parte pendente não gera grade/produtos finais.
-- [ ] Mensagem lista partes pendentes.
-- [ ] Regra única compartilhada com §4 (sem duplicar fórmula divergente).
+- [x] Produto com parte pendente não gera grade/produtos finais.
+- [x] Mensagem lista partes pendentes.
+- [x] Regra única compartilhada com §4 (sem duplicar fórmula divergente).
+
+**Implementação:** `GradeProdutoService::validatePartesConfiguradasParaMontagem` reutiliza `ProdutoComposicaoService::getPartesResumoComposicao`. Exceção `PartesPendentesMontagemException` → 422 com `partes_pendentes`. Aplicado em cadastrar, gerar-grade, gerar-produtos, preview e editar.
 
 **Padrão**
 
@@ -504,7 +506,7 @@ UX Fase 6  → B4 (GET /fluxo-producao/progresso)
 - [x] **B1** `composicao-produtos/cadastrar` sempre permite obter `id` do vínculo criado. *(já ok no código; sem mudança necessária)*
 - [x] **B1** Demais creates do fluxo consistentes com o template (`data` + `status` + `message`). *(já ok no código; sem mudança necessária)*
 - [x] **B2** View composição: `configurada`, `total_variacoes`, `variacoes_com_filamento` (e alias `id_projeto_impressao_parte`).
-- [ ] **B3** Grade exige todas as partes configuradas (`422` + `partes_pendentes`).
+- [x] **B3** Grade exige todas as partes configuradas (`422` + `partes_pendentes`).
 - [ ] **B4** `GET /fluxo-producao/progresso?produto={id}` com subpassos + `partes_resumo`.
 - [ ] Regra única de “parte configurada” compartilhada (composição + progresso + grade).
 

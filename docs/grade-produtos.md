@@ -235,6 +235,20 @@ Localiza automaticamente a composição ativa do produto base e retorna partes, 
 
 Path canônico do `id` (fluxo de produção / redirect): `gradeProduto.data.id`.
 
+### Pré-condição — partes configuradas
+
+Cadastro, preview e geração exigem **todas** as partes do vínculo com `configurada = true`. Caso contrário → `422`:
+
+```json
+{
+  "error": true,
+  "message": "Não é possível montar: existem partes sem configuração completa.",
+  "partes_pendentes": [
+    { "id_projeto_impressao_parte": 16, "nome_parte": "Base" }
+  ]
+}
+```
+
 ---
 
 ## Preview — `POST /preview-produtos`
